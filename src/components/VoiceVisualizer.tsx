@@ -3,12 +3,14 @@ import React from 'react';
 
 interface VoiceVisualizerProps {
   isActive?: boolean;
-  emotion?: 'neutral' | 'anger' | 'compassion' | 'frustration';
+  emotion?: 'neutral' | 'anger' | 'compassion' | 'frustration' | 'enthusiasm' | 'concern';
+  intensity?: 'low' | 'medium' | 'high';
 }
 
 const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({ 
   isActive = false,
-  emotion = 'neutral'
+  emotion = 'neutral',
+  intensity = 'medium'
 }) => {
   const getEmotionColor = () => {
     switch(emotion) {
@@ -18,13 +20,22 @@ const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({
         return 'bg-progress-green';
       case 'frustration':
         return 'bg-warning-orange';
+      case 'enthusiasm':
+        return 'bg-reflection-yellow';
+      case 'concern':
+        return 'bg-purple-500';
       default:
         return 'bg-hope-turquoise';
     }
   };
 
+  const getIntensityStyle = () => {
+    const baseHeight = intensity === 'low' ? 8 : intensity === 'medium' ? 12 : 16;
+    return `h-${baseHeight}`;
+  };
+
   return (
-    <div className="flex items-end justify-center h-12 gap-1 my-4">
+    <div className={`flex items-end justify-center ${getIntensityStyle()} gap-1 my-4`}>
       {[1, 2, 3, 4, 5].map((barIndex) => (
         <div
           key={barIndex}
@@ -33,7 +44,8 @@ const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({
           } transform-origin-bottom transition-height duration-300`}
           style={{ 
             animationPlayState: isActive ? 'running' : 'paused',
-            height: isActive ? undefined : '4px'
+            height: isActive ? undefined : '4px',
+            animationDuration: `${0.8 + (barIndex * 0.1)}s`
           }}
         />
       ))}

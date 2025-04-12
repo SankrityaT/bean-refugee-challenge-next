@@ -4,79 +4,98 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { cn } from '@/lib/utils';
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
-export interface PolicyCardProps {
+interface PolicyCardProps {
   title: string;
   description: string;
   impact: string;
-  cost: number;
-  icon: React.ReactNode;
-  category: 'housing' | 'education' | 'healthcare' | 'employment' | 'integration';
+  tier: number;
+  icon: any;
+  category: string;
+  isSelected?: boolean;
   onClick: () => void;
 }
 
 const getCategoryStyles = (category: string) => {
   switch(category) {
-    case 'housing':
+    case 'access':
       return 'border-l-8 border-l-hope-turquoise';
-    case 'education':
+    case 'language':
       return 'border-l-8 border-l-reflection-yellow';
-    case 'healthcare':
+    case 'teacher':
       return 'border-l-8 border-l-progress-green';
-    case 'employment':
+    case 'curriculum':
       return 'border-l-8 border-l-warning-orange';
-    case 'integration':
+    case 'psychosocial':
       return 'border-l-8 border-l-policy-maroon';
+    case 'financial':
+      return 'border-l-8 border-l-purple-500';
+    case 'certification':
+      return 'border-l-8 border-l-blue-500';
     default:
-      return '';
+      return 'border-l-8 border-l-gray-400';
   }
+};
+
+const getImpactStyles = (impact: string) => {
+  switch(impact) {
+    case 'Exclusionary':
+      return 'bg-red-100 text-red-800';
+    case 'Moderate Inclusion':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'Transformative':
+      return 'bg-green-100 text-green-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+};
+
+const getTierDisplay = (tier: number) => {
+  return '●'.repeat(tier) + '○'.repeat(3 - tier);
 };
 
 const PolicyCard: React.FC<PolicyCardProps> = ({ 
   title, 
   description, 
   impact, 
-  cost,
+  tier,
   icon,
   category,
+  isSelected = false,
   onClick
 }) => {
   return (
     <Card className={cn(
       "transition-all duration-300 hover:shadow-lg hover:-translate-y-1",
-      getCategoryStyles(category)
+      getCategoryStyles(category),
+      isSelected ? "ring-2 ring-policy-maroon ring-offset-2" : ""
     )}>
-      <CardHeader className="bg-policy-maroon text-white">
-        <div className="flex items-center gap-3">
-          <div className="text-hope-turquoise">
-            {icon}
-          </div>
-          <CardTitle className="font-bebas text-2xl">{title}</CardTitle>
-        </div>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg flex items-center gap-2">
+          {React.createElement(icon, { className: "h-5 w-5" })}
+          {title}
+        </CardTitle>
       </CardHeader>
-      <CardContent className="pt-4">
-        <CardDescription className="font-opensans text-base mb-4">{description}</CardDescription>
-        <div className="flex justify-between items-center mb-1">
-          <span className="text-sm font-semibold">Impact:</span>
-          <span className="text-progress-green font-bold">{impact}</span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-sm font-semibold">Budget Cost:</span>
-          <span className={cn(
-            "font-bold",
-            cost > 75 ? "text-warning-orange" : "text-black"
-          )}>
-            ${cost}M
-          </span>
+      <CardContent className="pb-2">
+        <CardDescription>{description}</CardDescription>
+        <div className="flex justify-between items-center mt-4">
+          <Badge className={getImpactStyles(impact)}>
+            {impact}
+          </Badge>
+          <div className="text-sm font-medium">
+            Tier: {getTierDisplay(tier)}
+          </div>
         </div>
       </CardContent>
       <CardFooter>
         <Button 
-          onClick={onClick}
-          className="w-full bg-hope-turquoise hover:bg-hope-turquoise/80 text-black"
+          onClick={onClick} 
+          variant={isSelected ? "destructive" : "default"}
+          className="w-full"
         >
-          Select Policy
+          {isSelected ? "Remove Policy" : "Select Policy"}
         </Button>
       </CardFooter>
     </Card>

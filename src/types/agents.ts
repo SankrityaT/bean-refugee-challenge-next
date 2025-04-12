@@ -1,5 +1,19 @@
 
-export type AgentStance = 'neoliberal' | 'socialist' | 'liberal' | 'moderate' | 'conservative';
+export enum AgentStance {
+  NEOLIBERAL = 'NEOLIBERAL',
+  PROGRESSIVE = 'PROGRESSIVE',
+  MODERATE = 'MODERATE',
+  HUMANITARIAN = 'HUMANITARIAN'
+}
+
+export interface AIAgentProps {
+  name: string;
+  stance: AgentStance;
+  role: string;
+  age: number;
+  concerns: string[];
+  onInteract: () => void;
+}
 
 export interface AIAgent {
   id: string;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,49 +11,127 @@ import ReflectionPrompt from '@/components/ReflectionPrompt';
 import AIAgent from '@/components/AIAgent';
 import BudgetIndicator from '@/components/BudgetIndicator';
 import OnboardingView from '@/components/OnboardingView';
-import { POLICY_AREAS, REFLECTION_QUESTIONS, AI_AGENTS } from '@/data/game-data';
+import { POLICY_AREAS } from '@/data/game-data';
+import { REFLECTION_QUESTIONS } from '@/data/reflection-questions';
+import { AI_AGENTS } from '@/data/game-data';
+import { AgentStance } from '@/types/agents';
+import { validateSelections, calculateRemainingUnits } from '@/lib/budget-engine';
+import { usePhaseManager, GamePhase } from '@/lib/phase-manager';
+import { generateReflection } from '@/lib/reflection-engine';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import ReportDocument from '@/components/ReportDocument';
 
 export default function Home() {
   const [selectedPolicies, setSelectedPolicies] = useState<string[]>([]);
-  const [currentTab, setCurrentTab] = useState('policy');
-  const [allocatedBudget, setAllocatedBudget] = useState(0);
+  const [currentTab, setCurrentTab] = useState<GamePhase>('policy');
+  const [negotiationLogs, setNegotiationLogs] = useState<any[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(true);
-  const totalBudget = 200; // $200M total budget
+  const [reflectionData, setReflectionData] = useState(null);
+  const [budgetValidation, setBudgetValidation] = useState({ 
+    isValid: true, 
+    warnings: [], 
+    totalUnits: 0,
+    tierDiversity: false
+  });
   
-  const handlePolicySelect = (policyId: string, policyCost: number) => {
+  const { canProceedToPhase } = usePhaseManager();
+  
+  // Get selected policy objects
+  const getSelectedPolicyObjects = () => {
+    const policies: any[] = [];
+    POLICY_AREAS.forEach(area => {
+      area.policies.forEach(policy => {
+        if (selectedPolicies.includes(policy.id)) {
+          policies.push({...policy, area: area.title});
+        }
+      });
+    });
+    return policies;
+  };
+  
+  // Validate budget whenever selected policies change
+  useEffect(() => {
+    const selectedPolicyObjects = getSelectedPolicyObjects();
+    const validation = validateSelections(selectedPolicyObjects);
+    setBudgetValidation(validation);
+  }, [selectedPolicies]);
+  
+  // Generate reflection data when entering reflection phase
+  useEffect(() => {
+    if (currentTab === 'reflection') {
+      const selectedPolicyObjects = getSelectedPolicyObjects();
+      const reflection = generateReflection(selectedPolicyObjects);
+      setReflectionData(reflection);
+    }
+  }, [currentTab]);
+  
+  const handlePolicySelect = (policyId: string, policyTier: number) => {
     if (selectedPolicies.includes(policyId)) {
       // Policy already selected, remove it
       setSelectedPolicies(prev => prev.filter(id => id !== policyId));
-      setAllocatedBudget(prev => prev - policyCost);
       toast({
         title: "Policy Removed",
-        description: `Policy has been removed from your plan. Budget updated.`,
+        description: `Policy has been removed from your plan.`,
       });
     } else {
       // Add new policy
       setSelectedPolicies(prev => [...prev, policyId]);
-      setAllocatedBudget(prev => prev + policyCost);
       
-      if (allocatedBudget + policyCost > totalBudget) {
+      const selectedPolicyObjects = getSelectedPolicyObjects().concat({id: policyId, tier: policyTier});
+      const validation = validateSelections(selectedPolicyObjects);
+      
+      if (!validation.isValid) {
         toast({
           title: "Budget Warning",
-          description: "You've exceeded your budget allocation!",
+          description: validation.warnings.join('. '),
           variant: "destructive",
+        });
+      } else if (validation.warnings.length > 0) {
+        toast({
+          title: "Budget Notice",
+          description: validation.warnings.join('. '),
         });
       } else {
         toast({
           title: "Policy Added",
-          description: `Policy has been added to your plan. Budget updated.`,
+          description: `Policy has been added to your plan.`,
         });
       }
     }
   };
   
   const handleAgentInteraction = (agentName: string) => {
+    // Add to negotiation logs
+    setNegotiationLogs(prev => [...prev, {
+      agent: agentName,
+      timestamp: new Date().toISOString()
+    }]);
+    
     toast({
       title: `${agentName} responds`,
       description: "The stakeholder has shared their perspective on your policies.",
     });
+  };
+  
+  const handleTabChange = (value: string) => {
+    const targetPhase = value as GamePhase;
+    
+    // Check if can proceed to the target phase
+    const data = targetPhase === 'negotiation' 
+      ? getSelectedPolicyObjects()
+      : negotiationLogs;
+      
+    const { canProceed, message } = canProceedToPhase(currentTab, targetPhase, data);
+    
+    if (canProceed) {
+      setCurrentTab(targetPhase);
+    } else {
+      toast({
+        title: "Cannot Proceed",
+        description: message,
+        variant: "destructive",
+      });
+    }
   };
   
   const handleCompleteOnboarding = () => {
@@ -68,6 +146,9 @@ export default function Home() {
     return <OnboardingView onComplete={handleCompleteOnboarding} />;
   }
   
+  // Calculate remaining budget units
+  const remainingUnits = calculateRemainingUnits(getSelectedPolicyObjects());
+  
   return (
     <div className="min-h-screen bg-gray-50 font-opensans">
       {/* Header */}
@@ -77,7 +158,7 @@ export default function Home() {
             THE CHALLENGE GAME
           </h1>
           <p className="text-hope-turquoise text-lg md:text-xl max-w-3xl">
-            Develop comprehensive refugee policies for the Republic of Bean while 
+            Develop comprehensive refugee education policies for the Republic of Bean while 
             balancing humanitarian needs with economic realities.
           </p>
         </div>
@@ -92,17 +173,31 @@ export default function Home() {
           <p className="text-gray-700">
             Yellow lines indicate major refugee movement patterns across borders.
             As the Minister of Refugee Affairs, your challenge is to develop effective
-            policies that address both immediate needs and long-term integration.
+            education policies that address both immediate needs and long-term integration.
           </p>
         </section>
         
-        {/* Budget Indicator */}
-        <BudgetIndicator totalBudget={totalBudget} allocatedBudget={allocatedBudget} />
+        {/* Budget Indicator - Updated to show units instead of monetary value */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="font-bebas text-lg">Policy Budget</h3>
+            <span className={`font-bold ${!budgetValidation.isValid ? 'text-warning-orange' : 'text-black'}`}>
+              {14 - remainingUnits} / 14 Units
+            </span>
+          </div>
+          
+          <BudgetIndicator 
+            totalBudget={14} 
+            allocatedBudget={14 - remainingUnits} 
+            isValid={budgetValidation.isValid}
+            warnings={budgetValidation.warnings}
+          />
+        </div>
         
         {/* Main Game Tabs */}
         <Tabs 
           value={currentTab} 
-          onValueChange={setCurrentTab}
+          onValueChange={handleTabChange}
           className="mt-8"
         >
           <TabsList className="grid w-full grid-cols-3">
@@ -113,130 +208,99 @@ export default function Home() {
           
           {/* Policy Selection Tab */}
           <TabsContent value="policy" className="mt-6">
-            <h2 className="font-bebas text-3xl mb-6">Select Your Policies</h2>
-            
-            {POLICY_AREAS.map((area) => (
-              <div key={area.id} className="mb-10">
-                <div className="flex items-center gap-2 mb-4">
-                  <area.icon className="h-6 w-6 text-hope-turquoise" />
-                  <h3 className="font-bebas text-2xl">{area.title}</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {POLICY_AREAS.map((area) => (
+                <div key={area.id} className="space-y-4">
+                  <h3 className="font-bebas text-2xl flex items-center gap-2">
+                    <area.icon className="h-6 w-6" />
+                    {area.title}
+                  </h3>
+                  <p className="text-sm text-gray-600">{area.description}</p>
+                  
+                  <div className="space-y-3">
+                    {area.policies.map((policy) => (
+                      <PolicyCard
+                        key={policy.id}
+                        title={policy.title}
+                        description={policy.description}
+                        impact={policy.impact}
+                        tier={policy.tier}
+                        icon={area.icon}
+                        category={area.id}
+                        isSelected={selectedPolicies.includes(policy.id)}
+                        onClick={() => handlePolicySelect(policy.id, policy.tier)}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <p className="text-gray-600 mb-4">{area.description}</p>
+              ))}
+            </div>
+          </TabsContent>
+          
+          {/* Stakeholder Negotiation Tab */}
+          <TabsContent value="negotiation" className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* AI Agents would be rendered here */}
+              <AIAgent 
+                name="Minister Santos" 
+                stance={AgentStance.NEOLIBERAL}
+                onInteract={() => handleAgentInteraction("Minister Santos")}
+              />
+              <AIAgent 
+                name="Dr. Chen" 
+                stance={AgentStance.PROGRESSIVE}
+                onInteract={() => handleAgentInteraction("Dr. Chen")}
+              />
+              <AIAgent 
+                name="Mayor Okonjo" 
+                stance={AgentStance.MODERATE}
+                onInteract={() => handleAgentInteraction("Mayor Okonjo")}
+              />
+              <AIAgent 
+                name="Community Leader Patel" 
+                stance={AgentStance.HUMANITARIAN}
+                onInteract={() => handleAgentInteraction("Community Leader Patel")}
+              />
+            </div>
+          </TabsContent>
+          
+          {/* Ethical Reflection Tab */}
+          <TabsContent value="reflection" className="mt-6">
+            {reflectionData && (
+              <div className="space-y-8">
+                <div className="bg-white p-6 rounded-lg shadow-sm">
+                  <h3 className="font-bebas text-2xl mb-4">Policy Impact Assessment</h3>
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="text-4xl font-bold">{reflectionData.equityScore}</div>
+                    <div>
+                      <p className="font-semibold">Equity Score</p>
+                      <p className="text-sm text-gray-600">Based on UNESCO inclusion metrics</p>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4">
+                    <PDFDownloadLink 
+                      document={<ReportDocument policies={getSelectedPolicyObjects()} reflectionData={reflectionData} />}
+                      fileName="refugee-policy-report.pdf"
+                      className="bg-policy-maroon text-white px-4 py-2 rounded-md hover:bg-opacity-90 transition-all"
+                    >
+                      {({ loading }) => loading ? 'Generating report...' : 'Download Policy Report (PDF)'}
+                    </PDFDownloadLink>
+                  </div>
+                </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {area.policies.map((policy) => (
-                    <PolicyCard
-                      key={policy.id}
-                      title={policy.title}
-                      description={policy.description}
-                      impact={policy.impact}
-                      cost={policy.cost}
-                      icon={<area.icon className="h-5 w-5" />}
-                      category={area.id as any}
-                      onClick={() => handlePolicySelect(policy.id, policy.cost)}
+                <div className="space-y-6">
+                  <h3 className="font-bebas text-2xl">Reflection Questions</h3>
+                  {reflectionData.questions.map((question) => (
+                    <ReflectionPrompt 
+                      key={question.id}
+                      question={question.question}
+                      category={question.category}
                     />
                   ))}
                 </div>
-                
-                <Separator className="mt-8 mb-2" />
               </div>
-            ))}
-            
-            <div className="flex justify-end mt-6">
-              <Button 
-                onClick={() => setCurrentTab('negotiation')}
-                className="bg-hope-turquoise text-black hover:bg-hope-turquoise/80"
-              >
-                Proceed to Stakeholder Negotiation
-              </Button>
-            </div>
-          </TabsContent>
-          
-          {/* Negotiation Tab */}
-          <TabsContent value="negotiation" className="mt-6">
-            <h2 className="font-bebas text-3xl mb-6">Negotiate With Stakeholders</h2>
-            <p className="text-gray-700 mb-6">
-              Present your policy choices to key stakeholders. Each has their own priorities
-              and concerns. Try to build consensus while maintaining your core goals.
-            </p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-              {AI_AGENTS.map((agent) => (
-                <AIAgent
-                  key={agent.id}
-                  name={agent.name}
-                  role={agent.role}
-                  stance={agent.stance}
-                  age={agent.age}
-                  concerns={agent.concerns}
-                  onInteract={() => handleAgentInteraction(agent.name)}
-                />
-              ))}
-            </div>
-            
-            <div className="bg-gray-100 rounded-lg p-6 mt-10">
-              <h3 className="font-bebas text-xl mb-3">Negotiation Progress</h3>
-              <p className="text-gray-700">
-                As you engage with stakeholders, their feedback will influence the success of your policies.
-                Try to address their concerns without compromising your humanitarian goals.
-              </p>
-              <div className="mt-4 flex gap-4 justify-end">
-                <Button 
-                  variant="outline"
-                  onClick={() => setCurrentTab('policy')}
-                >
-                  Revise Policies
-                </Button>
-                <Button 
-                  onClick={() => setCurrentTab('reflection')}
-                  className="bg-hope-turquoise text-black hover:bg-hope-turquoise/80"
-                >
-                  Proceed to Reflection
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-          
-          {/* Reflection Tab */}
-          <TabsContent value="reflection" className="mt-6">
-            <h2 className="font-bebas text-3xl mb-6">Ethical Reflection</h2>
-            <p className="text-gray-700 mb-6">
-              Consider the following questions to deepen your understanding of the ethical
-              dimensions of refugee policy and your decision-making process.
-            </p>
-            
-            <div className="space-y-2 mt-8">
-              {REFLECTION_QUESTIONS.map((item) => (
-                <ReflectionPrompt
-                  key={item.id}
-                  question={item.question}
-                  category={item.category}
-                />
-              ))}
-            </div>
-            
-            <div className="bg-white border rounded-lg p-6 mt-10 shadow-sm">
-              <h3 className="font-bebas text-xl mb-3">Game Completion</h3>
-              <p className="text-gray-700 mb-4">
-                You've completed all phases of the CHALLENGE Game. Your policy choices,
-                negotiation approaches, and ethical reflections demonstrate your approach
-                to refugee policy management.
-              </p>
-              <div className="mt-4 flex justify-end">
-                <Button 
-                  onClick={() => {
-                    toast({
-                      title: "Game Complete",
-                      description: "Thank you for playing the CHALLENGE Game!",
-                    });
-                    setCurrentTab('policy');
-                  }}
-                  className="bg-policy-maroon text-white hover:bg-policy-maroon/90"
-                >
-                  Complete Game
-                </Button>
-              </div>
-            </div>
+            )}
           </TabsContent>
         </Tabs>
       </main>
@@ -246,7 +310,7 @@ export default function Home() {
         <div className="container mx-auto text-center">
           <h2 className="font-bebas text-2xl mb-4">THE CHALLENGE GAME</h2>
           <p className="text-gray-300 max-w-2xl mx-auto">
-            A simulation designed to explore the complexities of refugee policy-making
+            A simulation designed to explore the complexities of refugee education policy-making
             through interactive decision-making and ethical reflection.
           </p>
           <div className="mt-6 text-sm text-gray-400">

@@ -1,81 +1,156 @@
 
-import React, { useState } from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Mic, MicOff } from "lucide-react";
+import { AIAgentProps, AgentStance } from '@/types/agents';
 import VoiceVisualizer from './VoiceVisualizer';
-import { AgentStance } from '@/types/agents';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-interface AIAgentProps {
-  name: string;
-  role: string;
-  stance: AgentStance;
-  onInteract: () => void;
-  age: number;
-  concerns: string;
-}
-
-const AIAgent: React.FC<AIAgentProps> = ({
-  name,
-  role,
-  stance,
-  onInteract,
-  age,
-  concerns
+// Enhanced AIAgent component with speaking animations
+const AIAgent: React.FC<Partial<AIAgentProps>> = ({ 
+  name = "Agent", 
+  stance = AgentStance.MODERATE,
+  role = "Stakeholder",
+  age = 45,
+  concerns = ["Education access", "Resource allocation"],
+  onInteract = () => console.log("Agent interaction")
 }) => {
-  const [emotion, setEmotion] = useState<'neutral' | 'anger' | 'compassion' | 'frustration'>('neutral');
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [userMuted, setUserMuted] = useState(false);
+  const [emotion, setEmotion] = useState<'neutral' | 'anger' | 'compassion' | 'frustration'>('neutral');
+  const [message, setMessage] = useState("");
+  
+  const getStanceColor = (stance: AgentStance) => {
+    switch(stance) {
+      case AgentStance.NEOLIBERAL:
+        return 'bg-blue-100 text-blue-800';
+      case AgentStance.PROGRESSIVE:
+        return 'bg-green-100 text-green-800';
+      case AgentStance.MODERATE:
+        return 'bg-yellow-100 text-yellow-800';
+      case AgentStance.HUMANITARIAN:
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+  
+  const getEmotionBasedOnStance = () => {
+    const emotions = {
+      [AgentStance.NEOLIBERAL]: ['neutral', 'frustration'],
+      [AgentStance.PROGRESSIVE]: ['compassion', 'enthusiasm'],
+      [AgentStance.MODERATE]: ['neutral', 'concern'],
+      [AgentStance.HUMANITARIAN]: ['compassion', 'concern']
+    };
+    
+    const stanceEmotions = emotions[stance] || ['neutral'];
+    return stanceEmotions[Math.floor(Math.random() * stanceEmotions.length)] as 'neutral' | 'anger' | 'compassion' | 'frustration';
+  };
   
   const handleInteract = () => {
     setIsSpeaking(true);
+    setEmotion(getEmotionBasedOnStance());
     
-    // More nuanced emotion selection based on stance
-    const stanceEmotions = {
-      'neoliberal': ['neutral', 'frustration'],
-      'socialist': ['compassion', 'anger'],
-      'liberal': ['neutral', 'compassion'],
-      'moderate': ['neutral'],
-      'conservative': ['frustration']
+    // Simulate agent speaking with different messages based on stance
+    const stanceMessages = {
+      [AgentStance.NEOLIBERAL]: [
+        "We need to consider the economic impact of these policies.",
+        "How will this affect our budget long-term?",
+        "Let's focus on sustainable solutions that don't strain resources."
+      ],
+      [AgentStance.PROGRESSIVE]: [
+        "Education access must be equitable for all refugees.",
+        "These children deserve the same opportunities as everyone else.",
+        "We should prioritize inclusive policies over cost concerns."
+      ],
+      [AgentStance.MODERATE]: [
+        "We need to balance humanitarian needs with practical constraints.",
+        "Let's find middle ground that works for everyone.",
+        "I see merit in both approaches to this issue."
+      ],
+      [AgentStance.HUMANITARIAN]: [
+        "The wellbeing of refugee children must come first.",
+        "We have a moral obligation to provide quality education.",
+        "These policies don't go far enough to address trauma and displacement."
+      ]
     };
     
-    const emotions = stanceEmotions[stance] || ['neutral'];
-    const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)] as 
-      'neutral' | 'anger' | 'compassion' | 'frustration';
+    const messages = stanceMessages[stance] || ["I'd like to discuss these policies further."];
+    setMessage(messages[Math.floor(Math.random() * messages.length)]);
     
-    setEmotion(randomEmotion);
+    // Simulate speaking duration based on message length
+    const speakingTime = Math.max(2000, message.length * 50);
     
     setTimeout(() => {
       setIsSpeaking(false);
       onInteract();
-    }, 3000);
+    }, speakingTime);
   };
   
   return (
-    <div className="flex flex-col items-center p-4 border rounded-lg bg-white hover:shadow-md transition-shadow">
-      <Avatar className="h-20 w-20 mb-3">
-        <AvatarFallback className="text-lg font-bold bg-gray-200">
-          {name.substring(0, 2).toUpperCase()}
-        </AvatarFallback>
-      </Avatar>
-      
-      <h3 className="font-bebas text-xl">{name}</h3>
-      <p className="text-sm text-gray-600 mb-2">{role}, {age} years old</p>
-      <p className="text-xs text-gray-500 mb-2 italic">{concerns}</p>
-      
-      <div className="px-3 py-1 rounded-full text-xs font-medium mb-3 bg-gray-200 text-gray-700">
-        {stance.charAt(0).toUpperCase() + stance.slice(1)} Stance
-      </div>
-      
-      <VoiceVisualizer isActive={isSpeaking} emotion={emotion} />
-      
-      <Button 
-        onClick={handleInteract}
-        disabled={isSpeaking}
-        variant="outline"
-        className="mt-2 border-hope-turquoise text-hope-turquoise hover:bg-hope-turquoise hover:text-white"
-      >
-        {isSpeaking ? 'Speaking...' : 'Engage'}
-      </Button>
-    </div>
+    <Card className="transition-all duration-300 hover:shadow-md">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-10 w-10">
+              <AvatarFallback className="bg-gray-200">
+                {name.substring(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <CardTitle className="text-lg">{name}</CardTitle>
+              <CardDescription>{role}, {age} years old</CardDescription>
+            </div>
+          </div>
+          <Badge className={getStanceColor(stance)}>
+            {stance.toLowerCase()}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="mt-2">
+          <p className="text-sm text-gray-600">Key concerns:</p>
+          <ul className="list-disc pl-5 text-sm">
+            {Array.isArray(concerns) ? concerns.map((concern, index) => (
+              <li key={index}>{concern}</li>
+            )) : <li>{concerns}</li>}
+          </ul>
+        </div>
+        
+        {/* Speaking animation and message */}
+        <div className="mt-4 min-h-[80px] bg-gray-50 rounded-md p-3 relative">
+          {isSpeaking ? (
+            <>
+              <VoiceVisualizer isActive={isSpeaking} emotion={emotion} />
+              <p className="text-sm mt-2 italic">{message}</p>
+            </>
+          ) : (
+            <p className="text-sm text-gray-500 text-center">
+              {message ? "..." : "Click 'Start Discussion' to engage"}
+            </p>
+          )}
+        </div>
+      </CardContent>
+      <CardFooter className="flex justify-between">
+        <Button 
+          onClick={() => setUserMuted(!userMuted)}
+          variant="outline"
+          size="sm"
+          className="w-12"
+        >
+          {userMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+        </Button>
+        <Button 
+          onClick={handleInteract} 
+          disabled={isSpeaking}
+          className="flex-1 ml-2"
+        >
+          {isSpeaking ? 'Listening...' : 'Start Discussion'}
+        </Button>
+      </CardFooter>
+    </Card>
   );
 };
 

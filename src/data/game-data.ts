@@ -1,7 +1,9 @@
 import { Book, Languages, Users, GraduationCap, Heart, Coins, FileCheck } from 'lucide-react';
 import { AgentStance } from '@/types/agents';
+import { PolicyArea } from '../types/policies';
 
-export const POLICY_AREAS = [
+// Updated to include all 7 refugee-specific domains
+export const POLICY_AREAS: PolicyArea[] = [
   {
     id: 'access',
     title: 'Access to Education',
@@ -9,27 +11,24 @@ export const POLICY_AREAS = [
     icon: Book,
     policies: [
       {
-        id: 'a1',
+        id: 'access1',
         title: 'Separate Schools',
-        description: 'Create separate schools for refugees with minimal resources.',
+        description: 'Create separate schools for refugees with specialized curriculum.',
         impact: 'Exclusionary',
-        cost: 1,
         tier: 1
       },
       {
-        id: 'a2',
-        title: 'Partial Integration',
-        description: 'Allow refugees to attend local schools with some restrictions.',
+        id: 'access2',
+        title: 'Mainstream Integration',
+        description: 'Place refugees in regular schools with some support services.',
         impact: 'Moderate Inclusion',
-        cost: 2,
         tier: 2
       },
       {
-        id: 'a3',
-        title: 'Full Integration',
-        description: 'Fully integrate refugees into local schools with comprehensive support.',
+        id: 'access3',
+        title: 'Full Inclusion Model',
+        description: 'Comprehensive integration with individualized support plans.',
         impact: 'Transformative',
-        cost: 3,
         tier: 3
       }
     ]
@@ -37,63 +36,57 @@ export const POLICY_AREAS = [
   {
     id: 'language',
     title: 'Language Instruction',
-    description: 'Approaches to language education for refugee students.',
+    description: 'Approaches to language learning for refugee students.',
     icon: Languages,
     policies: [
       {
-        id: 'l1',
-        title: 'Monolingual Approach',
-        description: 'Teach only in the official language, no mother tongue support.',
+        id: 'language1',
+        title: 'Basic Translation Services',
+        description: 'Provide minimal translation support for core subjects only.',
         impact: 'Exclusionary',
-        cost: 1,
         tier: 1
       },
       {
-        id: 'l2',
-        title: 'Limited Bilingual Support',
-        description: 'Provide basic mother tongue support during transition period.',
+        id: 'language2',
+        title: 'Bilingual Education',
+        description: 'Teach in both native language and host country language.',
         impact: 'Moderate Inclusion',
-        cost: 2,
         tier: 2
       },
       {
-        id: 'l3',
-        title: 'Comprehensive Multilingual Education',
-        description: 'Develop full multilingual curriculum and resources.',
+        id: 'language3',
+        title: 'Comprehensive Language Program',
+        description: 'Intensive language instruction with cultural context and academic support.',
         impact: 'Transformative',
-        cost: 3,
         tier: 3
       }
     ]
   },
   {
-    id: 'teachers',
+    id: 'teacher',
     title: 'Teacher Training',
     description: 'Professional development for educators working with refugee students.',
-    icon: GraduationCap,
+    icon: Users,
     policies: [
       {
-        id: 't1',
-        title: 'No Additional Training',
-        description: 'Rely on existing teacher skills with no refugee-specific training.',
+        id: 'teacher1',
+        title: 'Basic Cultural Awareness',
+        description: 'One-time workshop on cultural differences for teachers.',
         impact: 'Exclusionary',
-        cost: 1,
         tier: 1
       },
       {
-        id: 't2',
-        title: 'Basic Diversity Workshops',
-        description: 'Provide short-term diversity and inclusion training for teachers.',
+        id: 'teacher2',
+        title: 'Trauma-Informed Teaching',
+        description: 'Regular training on trauma-informed approaches and cultural competence.',
         impact: 'Moderate Inclusion',
-        cost: 2,
         tier: 2
       },
       {
-        id: 't3',
-        title: 'Comprehensive Refugee Education Certification',
-        description: 'Develop specialized certification program for teaching refugee populations.',
+        id: 'teacher3',
+        title: 'Specialized Certification Program',
+        description: 'Comprehensive certification program for teaching refugee students with ongoing support.',
         impact: 'Transformative',
-        cost: 3,
         tier: 3
       }
     ]
@@ -101,31 +94,28 @@ export const POLICY_AREAS = [
   {
     id: 'curriculum',
     title: 'Curriculum Adaptation',
-    description: 'Changes to educational content to reflect refugee experiences.',
-    icon: Book,
+    description: 'Modifications to educational content to meet refugee student needs.',
+    icon: GraduationCap,
     policies: [
       {
-        id: 'c1',
+        id: 'curriculum1',
         title: 'Standard Curriculum Only',
-        description: 'No adaptation of existing curriculum for refugee students.',
+        description: 'Use existing curriculum with minimal modifications.',
         impact: 'Exclusionary',
-        cost: 1,
         tier: 1
       },
       {
-        id: 'c2',
+        id: 'curriculum2',
         title: 'Supplemental Materials',
-        description: 'Add cultural supplements to existing curriculum.',
+        description: 'Standard curriculum with supplemental culturally relevant materials.',
         impact: 'Moderate Inclusion',
-        cost: 2,
         tier: 2
       },
       {
-        id: 'c3',
+        id: 'curriculum3',
         title: 'Inclusive Curriculum Redesign',
-        description: 'Completely redesign curriculum to be culturally responsive and inclusive.',
+        description: 'Comprehensive curriculum redesign with refugee perspectives integrated throughout.',
         impact: 'Transformative',
-        cost: 3,
         tier: 3
       }
     ]
@@ -133,31 +123,28 @@ export const POLICY_AREAS = [
   {
     id: 'psychosocial',
     title: 'Psychosocial Support',
-    description: 'Mental health and social-emotional wellbeing initiatives for refugees.',
+    description: 'Mental health and social-emotional support for refugee students.',
     icon: Heart,
     policies: [
       {
-        id: 'p1',
-        title: 'No Dedicated Support',
-        description: 'No specialized mental health resources for refugee students.',
+        id: 'psychosocial1',
+        title: 'Basic Counseling Referrals',
+        description: 'Provide referrals to external services when severe issues arise.',
         impact: 'Exclusionary',
-        cost: 1,
         tier: 1
       },
       {
-        id: 'p2',
-        title: 'Basic Counseling Services',
-        description: 'Limited counseling and group support activities.',
+        id: 'psychosocial2',
+        title: 'School Counselors',
+        description: 'On-site counselors with some training in refugee trauma.',
         impact: 'Moderate Inclusion',
-        cost: 2,
         tier: 2
       },
       {
-        id: 'p3',
-        title: 'Comprehensive Trauma-Informed Care',
-        description: 'Full trauma-informed ecosystem with specialized personnel and family support.',
+        id: 'psychosocial3',
+        title: 'Comprehensive Wellbeing Program',
+        description: 'Integrated trauma-informed support system with specialized staff and family involvement.',
         impact: 'Transformative',
-        cost: 3,
         tier: 3
       }
     ]
@@ -169,27 +156,24 @@ export const POLICY_AREAS = [
     icon: Coins,
     policies: [
       {
-        id: 'f1',
-        title: 'No Financial Assistance',
-        description: 'No dedicated financial support for refugee education.',
+        id: 'financial1',
+        title: 'Basic School Supplies',
+        description: 'Provide essential school supplies only.',
         impact: 'Exclusionary',
-        cost: 1,
         tier: 1
       },
       {
-        id: 'f2',
-        title: 'Basic Needs Stipend',
-        description: 'Provide stipends for school supplies and basic materials.',
+        id: 'financial2',
+        title: 'Targeted Scholarships',
+        description: 'Scholarships for qualified refugee students and subsidized meals.',
         impact: 'Moderate Inclusion',
-        cost: 2,
         tier: 2
       },
       {
-        id: 'f3',
+        id: 'financial3',
         title: 'Comprehensive Support Package',
-        description: 'Full scholarship program including family subsistence support.',
+        description: 'Full financial support including transportation, technology, and family stipends.',
         impact: 'Transformative',
-        cost: 3,
         tier: 3
       }
     ]
@@ -197,31 +181,28 @@ export const POLICY_AREAS = [
   {
     id: 'certification',
     title: 'Certification/Accreditation',
-    description: 'Recognition of prior learning and qualifications from home countries.',
+    description: 'Recognition of prior learning and qualification frameworks.',
     icon: FileCheck,
     policies: [
       {
-        id: 'cr1',
-        title: 'No Recognition',
-        description: 'No recognition of prior education or qualifications.',
+        id: 'certification1',
+        title: 'Limited Recognition',
+        description: 'Minimal recognition of prior education with extensive retesting required.',
         impact: 'Exclusionary',
-        cost: 1,
         tier: 1
       },
       {
-        id: 'cr2',
-        title: 'Partial Recognition',
-        description: 'Limited recognition of prior learning with extensive verification.',
+        id: 'certification2',
+        title: 'Partial Equivalency',
+        description: 'Recognize some prior qualifications with bridging courses available.',
         impact: 'Moderate Inclusion',
-        cost: 2,
         tier: 2
       },
       {
-        id: 'cr3',
-        title: 'Full Recognition System',
-        description: 'Comprehensive system for validating and recognizing prior education.',
+        id: 'certification3',
+        title: 'Comprehensive Recognition Framework',
+        description: 'Flexible qualification recognition system with multiple pathways to certification.',
         impact: 'Transformative',
-        cost: 3,
         tier: 3
       }
     ]

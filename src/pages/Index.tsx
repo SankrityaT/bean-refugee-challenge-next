@@ -152,6 +152,8 @@ const Index = () => {
                   name={agent.name}
                   role={agent.role}
                   stance={agent.stance}
+                  age={agent.age}
+                  concerns={agent.concerns}
                   onInteract={() => handleAgentInteraction(agent.name)}
                 />
               ))}

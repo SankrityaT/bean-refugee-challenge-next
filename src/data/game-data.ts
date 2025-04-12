@@ -241,7 +241,7 @@ export const REFLECTION_QUESTIONS = [
   },
   {
     id: 'r3',
-    question: 'How did the budget constraint affect your imagination of what's possible?',
+    question: 'How did the budget constraint affect your imagination of what\'s possible?', // Added backslash to escape apostrophe
     category: 'Resource Allocation'
   },
   {

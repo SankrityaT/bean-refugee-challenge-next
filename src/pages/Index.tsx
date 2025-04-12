@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -9,12 +8,14 @@ import PolicyCard from '@/components/PolicyCard';
 import ReflectionPrompt from '@/components/ReflectionPrompt';
 import AIAgent from '@/components/AIAgent';
 import BudgetIndicator from '@/components/BudgetIndicator';
+import OnboardingView from '@/components/OnboardingView';
 import { POLICY_AREAS, REFLECTION_QUESTIONS, AI_AGENTS } from '@/data/game-data';
 
 const Index = () => {
   const [selectedPolicies, setSelectedPolicies] = useState<string[]>([]);
   const [currentTab, setCurrentTab] = useState('policy');
   const [allocatedBudget, setAllocatedBudget] = useState(0);
+  const [showOnboarding, setShowOnboarding] = useState(true);
   const totalBudget = 200; // $200M total budget
   
   const handlePolicySelect = (policyId: string, policyCost: number) => {
@@ -52,6 +53,18 @@ const Index = () => {
       description: "The stakeholder has shared their perspective on your policies.",
     });
   };
+  
+  const handleCompleteOnboarding = () => {
+    setShowOnboarding(false);
+    toast({
+      title: "Welcome to The CHALLENGE Game",
+      description: "You can now start making policy decisions for the Republic of Bean.",
+    });
+  };
+  
+  if (showOnboarding) {
+    return <OnboardingView onComplete={handleCompleteOnboarding} />;
+  }
   
   return (
     <div className="min-h-screen bg-gray-50 font-opensans">

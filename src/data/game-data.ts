@@ -1,5 +1,5 @@
-
 import { Book, Languages, Users, GraduationCap, Heart, Coins, FileCheck } from 'lucide-react';
+import { AgentStance } from '@/types/agents';
 
 export const POLICY_AREAS = [
   {
@@ -241,7 +241,7 @@ export const REFLECTION_QUESTIONS = [
   },
   {
     id: 'r3',
-    question: 'How did the budget constraint affect your imagination of what\'s possible?', // Added backslash to escape apostrophe
+    question: 'How did the budget constraint affect your imagination of what\'s possible?',
     category: 'Resource Allocation'
   },
   {
@@ -287,31 +287,39 @@ export const AI_AGENTS = [
     name: 'Dr. Rodriguez',
     role: 'Economist',
     age: 52,
-    stance: 'neoliberal' as const,
-    concerns: 'Economic efficiency and fiscal responsibility'
+    stance: 'neoliberal' as AgentStance,
+    concerns: 'Economic efficiency and fiscal responsibility',
+    educationalLevel: 'PhD in Economics',
+    socioeconomicStatus: 'Upper Middle Class'
   },
   {
     id: 'agent2',
     name: 'Imani Okafor',
     role: 'NGO Director',
     age: 34,
-    stance: 'socialist' as const,
-    concerns: 'Social justice and equal resource distribution'
+    stance: 'socialist' as AgentStance,
+    concerns: 'Social justice and equal resource distribution',
+    educationalLevel: 'Master\'s in International Development',
+    socioeconomicStatus: 'Middle Class'
   },
   {
     id: 'agent3',
     name: 'Mayor Kim',
     role: 'Local Government',
     age: 45,
-    stance: 'liberal' as const,
-    concerns: 'Community integration and local resources'
+    stance: 'liberal' as AgentStance,
+    concerns: 'Community integration and local resources',
+    educationalLevel: 'Master\'s in Public Administration',
+    socioeconomicStatus: 'Upper Middle Class'
   },
   {
     id: 'agent4',
     name: 'Alex Taylor',
     role: 'Teacher',
     age: 29,
-    stance: 'moderate' as const,
-    concerns: 'Classroom implementation and student wellbeing'
+    stance: 'moderate' as AgentStance,
+    concerns: 'Classroom implementation and student wellbeing',
+    educationalLevel: 'Bachelor\'s in Education',
+    socioeconomicStatus: 'Middle Class'
   }
 ];

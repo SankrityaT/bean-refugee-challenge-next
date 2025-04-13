@@ -12,107 +12,186 @@ import VoiceVisualizer from './VoiceVisualizer';
 interface ReflectionPromptProps {
   question: string;
   category: string;
+  onSave?: (response: string) => void;
 }
 
 const ReflectionPrompt: React.FC<ReflectionPromptProps> = ({ 
   question,
-  category
+  category,
+  onSave
 }) => {
   const [response, setResponse] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [transcription, setTranscription] = useState('');
+  const [recordingEmotion, setRecordingEmotion] = useState<'neutral' | 'enthusiasm' | 'concern'>('neutral');
   
-  // Mock speech recognition (in a real implementation, you'd use the Web Speech API)
+  // Reference to the speech recognition object
+  const recognitionRef = useRef<any>(null);
+  
+  // Initialize speech recognition
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+  
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      console.warn('Speech recognition not supported');
+      return;
+    }
+  
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+  
+    recognition.onstart = () => {
+      setIsRecording(true);
+      console.log('Recording started');
+    };
+  
+    recognition.onend = () => {
+      setIsRecording(false);
+      console.log('Recording ended');
+    };
+  
+    recognition.onresult = (event) => {
+      const lastResult = event.results[event.results.length - 1];
+      const transcript = lastResult[0].transcript;
+      
+      if (lastResult.isFinal) {
+        setResponse(prev => prev + ' ' + transcript);
+      } else {
+        setTranscription(transcript);
+      }
+  
+      // Emotion analysis
+      analyzeSentiment(transcript);
+    };
+  
+    recognition.onerror = (event) => {
+      console.error('Recognition error:', event.error);
+      setIsRecording(false);
+    };
+  
+    recognitionRef.current = recognition;
+  
+    return () => {
+      recognition.stop();
+    };
+  }, []);
+  
+  const analyzeSentiment = (text: string) => {
+    const lowerText = text.toLowerCase();
+    if (/excit|happy|great|wonderful/i.test(lowerText)) {
+      setRecordingEmotion('enthusiasm');
+    } else if (/worr|concern|problem|issue/i.test(lowerText)) {
+      setRecordingEmotion('concern');
+    } else {
+      setRecordingEmotion('neutral');
+    }
+  };
+  
   const startRecording = () => {
     setIsRecording(true);
+    setTranscription('');
     
-    // In a real implementation, you would use the SpeechRecognition API
-    // For now, we'll simulate transcription with a timeout
-    setTimeout(() => {
-      const mockResponses = [
-        "I believe our policies tried to balance immediate needs with long-term integration goals, but we may have overlooked the cultural preservation aspect.",
-        "The budget constraints definitely limited our thinking. We focused too much on cost-effective solutions rather than transformative ones.",
-        "I think we prioritized education access but might have neglected the quality aspect in our decision-making process."
-      ];
-      
-      const newTranscription = mockResponses[Math.floor(Math.random() * mockResponses.length)];
-      setTranscription(newTranscription);
-      setResponse(prev => prev + (prev ? ' ' : '') + newTranscription);
-      setIsRecording(false);
-    }, 3000); // Simulate 3 seconds of recording
+    if (recognitionRef.current) {
+      recognitionRef.current.start();
+    } else {
+      // Fallback for browsers without speech recognition
+      console.log('Speech recognition not supported in this browser');
+    }
   };
   
   const stopRecording = () => {
     setIsRecording(false);
-    // In a real implementation, you would stop the SpeechRecognition here
+    
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    
+    // Update the response with the transcription
+    if (transcription) {
+      setResponse(transcription);
+    }
   };
   
-  const handleSubmit = () => {
-    if (response.trim().length > 0) {
-      setIsSubmitted(true);
+  const handleSave = () => {
+    setIsSubmitted(true);
+    if (onSave) {
+      onSave(response);
     }
   };
   
   return (
-    <Card className="transition-all duration-300 hover:shadow-md">
-      <CardHeader className="pb-2">
-        <Badge className="w-fit mb-2 bg-reflection-yellow text-black">{category}</Badge>
-        <CardTitle className="text-lg">{question}</CardTitle>
+    <Card className="mb-6">
+      <CardHeader className="pb-3">
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle className="text-xl">{question}</CardTitle>
+            <CardDescription>Reflect on your policy choices</CardDescription>
+          </div>
+          <Badge variant="outline" className="bg-reflection-yellow bg-opacity-20">
+            {category}
+          </Badge>
+        </div>
       </CardHeader>
+      
       <CardContent>
-        <Textarea
-          placeholder="Type your reflection here or use the microphone to speak..."
-          className="min-h-[100px]"
-          value={response}
-          onChange={(e) => setResponse(e.target.value)}
-          disabled={isSubmitted || isRecording}
-        />
-        
         {isRecording && (
-          <div className="mt-4 p-3 bg-gray-50 rounded-md">
+          <div className="mb-4">
+            <p className="text-sm text-gray-500 mb-2">Recording in progress...</p>
             <VoiceVisualizer 
-              isActive={isRecording} 
-              emotion="neutral" 
-              intensity="medium"
+              isActive={true} 
+              emotion={recordingEmotion} 
+              intensity="medium" 
             />
-            <p className="text-sm text-center mt-2">Listening to your reflection...</p>
-            {transcription && (
-              <p className="text-sm italic mt-2">{transcription}</p>
-            )}
+            <p className="text-sm italic mt-2">{transcription || "Speak now..."}</p>
           </div>
         )}
+        
+        <Textarea
+          placeholder="Type or record your reflection here..."
+          className="min-h-[120px]"
+          value={response}
+          onChange={(e) => setResponse(e.target.value)}
+          disabled={isSubmitted}
+        />
       </CardContent>
-      <CardFooter className="flex justify-between gap-2">
-        {!isSubmitted ? (
-          <>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={isRecording ? stopRecording : startRecording}
-              disabled={isSubmitted}
-              className="w-12 h-10"
-            >
-              {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-            </Button>
+      
+      <CardFooter className="flex justify-between pt-0">
+        <div>
+          {!isRecording ? (
             <Button 
-              onClick={handleSubmit} 
-              className="flex-1 bg-reflection-yellow text-black hover:bg-yellow-600"
-              disabled={response.trim().length === 0 || isRecording}
+              variant="outline" 
+              size="sm" 
+              onClick={startRecording}
+              disabled={isSubmitted}
             >
-              <Save className="h-4 w-4 mr-2" />
-              Save Reflection
+              <Mic className="h-4 w-4 mr-2" />
+              Record Voice
             </Button>
-          </>
-        ) : (
-          <Button 
-            variant="outline" 
-            className="w-full"
-            onClick={() => setIsSubmitted(false)}
-          >
-            Edit Response
-          </Button>
-        )}
+          ) : (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={stopRecording}
+              className="text-red-500 border-red-500"
+            >
+              <MicOff className="h-4 w-4 mr-2" />
+              Stop Recording
+            </Button>
+          )}
+        </div>
+        
+        <Button 
+          onClick={handleSave} 
+          disabled={!response.trim() || isSubmitted}
+          size="sm"
+        >
+          <Save className="h-4 w-4 mr-2" />
+          {isSubmitted ? "Saved" : "Save Reflection"}
+        </Button>
       </CardFooter>
     </Card>
   );

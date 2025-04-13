@@ -1,9 +1,10 @@
 
 import React from 'react';
+import { EmotionType } from '@/lib/ai-negotiation/shared-types';
 
 interface VoiceVisualizerProps {
   isActive?: boolean;
-  emotion?: 'neutral' | 'anger' | 'compassion' | 'frustration' | 'enthusiasm' | 'concern';
+  emotion?: EmotionType;
   intensity?: 'low' | 'medium' | 'high';
 }
 

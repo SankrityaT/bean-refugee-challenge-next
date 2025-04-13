@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hume AI TTS Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 8px;
+        }
+        select {
+            padding: 8px;
+            width: 200px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .audio-container {
+            margin-top: 20px;
+        }
+        .loading {
+            display: none;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hume AI TTS Test</h1>
+    <div class="form-group">
+        <label for="text">Text to speak:</label>
+        <textarea id="text">This is a test of the Hume AI TTS API with different emotions.</textarea>
+    </div>
+    <div class="form-group">
+        <label for="emotion">Emotion:</label>
+        <select id="emotion">
+            <option value="neutral">Neutral</option>
+            <option value="anger">Anger</option>
+            <option value="compassion">Compassion</option>
+            <option value="frustration">Frustration</option>
+            <option value="enthusiasm">Enthusiasm</option>
+            <option value="concern">Concern</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="agent">Agent Name:</label>
+        <select id="agent">
+            <option value="Minister Santos">Minister Santos</option>
+            <option value="Dr. Chen">Dr. Chen</option>
+            <option value="Mayor Okonjo">Mayor Okonjo</option>
+            <option value="Community Leader Patel">Community Leader Patel</option>
+        </select>
+    </div>
+    <button id="generate">Generate Speech</button>
+    <div id="loading" class="loading">Generating speech...</div>
+    <div id="audio-container" class="audio-container"></div>
+
+    <script>
+        document.getElementById('generate').addEventListener('click', async () => {
+            const text = document.getElementById('text').value;
+            const emotion = document.getElementById('emotion').value;
+            const agentName = document.getElementById('agent').value;
+            const audioContainer = document.getElementById('audio-container');
+            const loading = document.getElementById('loading');
+
+            if (!text) {
+                alert('Please enter text to speak');
+                return;
+            }
+
+            // Clear previous audio
+            audioContainer.innerHTML = '';
+            loading.style.display = 'block';
+
+            try {
+                // Make request to our Flask API
+                const response = await fetch('http://localhost:5001/api/tts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        text,
+                        emotion,
+                        agentName
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API error: ${response.status} ${response.statusText} - ${errorText}`);
+                }
+
+                // Get audio blob
+                const audioBlob = await response.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+
+                // Create audio element
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                audio.src = audioUrl;
+                audio.style.width = '100%';
+
+                // Add audio element to page
+                audioContainer.appendChild(audio);
+
+                // Add download link
+                const downloadLink = document.createElement('a');
+                downloadLink.href = audioUrl;
+                downloadLink.download = `${agentName}_${emotion}.wav`;
+                downloadLink.textContent = 'Download Audio';
+                downloadLink.style.display = 'block';
+                downloadLink.style.marginTop = '10px';
+                audioContainer.appendChild(downloadLink);
+
+                // Add details
+                const details = document.createElement('div');
+                details.innerHTML = `<p><strong>Agent:</strong> ${agentName}<br><strong>Emotion:</strong> ${emotion}</p>`;
+                audioContainer.appendChild(details);
+
+            } catch (error) {
+                console.error('Error generating speech:', error);
+                audioContainer.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            } finally {
+                loading.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

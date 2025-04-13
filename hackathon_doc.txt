@@ -1,0 +1,85 @@
+AI CHALLENGE Hackathon: Detailed Structure and Expectations
+I. Purpose and Vision of the CHALLENGE Game
+The CHALLENGE (Creating Holistic Approaches for Learning, Liberty, and Equity in New Global Education) game was developed in response to a fundamental need: to create a reflective, participatory, and justice-oriented space for engaging with refugee education policy. Rooted in critical pedagogy and participatory action research (PAR), this simulation draws attention to the real-world implications of policy-making in refugee education contexts.
+At its core, the CHALLENGE game intervenes in the silence and erasure that often characterizes refugee education within mainstream teacher education and policy circles. It offers a dynamic and immersive experience that exposes players to the contradictions, moral dilemmas, and political tensions embedded in refugee education policy. Through this game, refugee education is no longer a distant humanitarian concern or a passive object of study. It becomes a lived, contested, and highly political domain of action.
+In the Republic of Bean—a fictional but deeply familiar setting shaped by historical exclusion, linguistic hegemony, and political instability—participants step into the roles of policymakers. The game invites them to make tough choices across seven policy domains under tight budget constraints, encouraging them to confront moral dilemmas, social tensions, and resource scarcity. Participants must grapple with competing demands and ideologies: the state's desire for control, citizens' fears of losing resources, and the human rights of displaced communities. These tensions mirror those seen across the globe, making the game both pedagogically powerful and politically relevant.
+The CHALLENGE game is not merely a tool for learning; it is a mechanism for transformation. It surfaces ethical quandaries, challenges dominant paradigms, and foregrounds marginalized voices. It does not ask players to passively learn about refugee education; it asks them to participate in shaping it. It reveals how decisions made under the guise of neutrality—budgeting, curriculum design, certification—are deeply ideological and often exclusionary. In doing so, the game calls into question the very logics that guide educational systems: who belongs, who is served, and who is silenced.
+In a world where refugee education is routinely reduced to integration strategies, and where policies often serve assimilation rather than liberation, this game makes space for radical rethinking. It asks players not only what is possible within the current system but also what justice would require beyond it. In that sense, CHALLENGE is both a mirror and a window: a mirror to reveal how our decisions reflect existing systems of power, and a window into what an education system truly committed to equity and pluralism might look like.
+II. Theoretical and Methodological Foundations
+CHALLENGE is grounded in several intersecting frameworks:
+	•	Critical Play (Flanagan, 2009): Encourages players to subvert dominant ideologies through gameplay.
+	•	Participatory Action Research (Kemmis, Bradbury): Participants are co-creators of knowledge.
+	•	Gamified Learning Theory (Landers, 2015): Demonstrates how game mechanics shape engagement and values.
+	•	Transformational Play (Barab et al., 2010): Players are positioned to act with agency and critically reflect.
+By using games as data collection and learning environments, CHALLENGE leverages both emotional engagement and intellectual exploration. It aligns with scholarship calling for decolonized, community-centered, and justice-forward approaches to refugee education. Gameplay is both a site of inquiry and a mode of resistance. The structure of the game intentionally simulates tensions found in real-world decision-making environments: limited budgets, competing interests, policy trade-offs, and the invisibilization of certain voices.
+III. Game Structure and Playing Process
+The game unfolds over three main stages and is designed for teams of five. It is both collaborative and personal, analytical and emotional, and requires players to critically engage with the underlying social, political, and ethical dimensions of education policy. Participants play the role of parliament members in the Republic of Bean, a country undergoing a national policy reform in response to the arrival of a large refugee population from a neighboring war-torn region.
+A. Country Background: Republic of Bean
+The Republic of Bean is a diverse yet fragile society. It is a country known for providing free education and public services but has long operated under a monolingual, monocultural education system dominated by the majority ethnic group, the Grapes. The largest minority group, the Curly Hairs, have long been denied their cultural rights, especially in education.
+Recently, two million refugees (14% of the national population) have entered the Republic of Bean from Orangenya, fleeing civil conflict. These refugees bring diverse languages, traditions, and educational needs. Amid growing xenophobia, economic instability, and political polarization, the parliament of the Republic of Bean must now develop a comprehensive refugee education reform package. That responsibility falls to you, the players.
+B. Policy Areas and Options
+Players must make decisions in the following seven policy areas:
+	•	Access to Education
+	•	Language Instruction
+	•	Teacher Training
+	•	Curriculum Adaptation
+	•	Psychosocial Support
+	•	Financial Support
+	•	Certification/Accreditation of Previous Educational Experience
+Each policy area contains three options:
+	•	Option 1: Exclusionary / minimal investment (1 budget unit)
+	•	Option 2: Moderate inclusion (2 budget units)
+	•	Option 3: Transformative / justice-focused (3 budget units)
+Each option is accompanied by its perceived advantages and disadvantages, reflecting different ideologies, interests, and resource constraints.
+C. Budget Constraint
+Teams are given a total of 14 units to allocate across the seven areas. This forces prioritization and sacrifice, simulating real-life constraints on national policymaking. It creates space for ethical tension and debate. For instance, will you fully fund access and inclusion while cutting support for psychosocial needs? Will you invest in training teachers or providing bilingual education? No team can afford all the most inclusive options, and that is intentional.
+D. Phase I: Individual Decision-Making
+Each player begins by studying the context and reviewing the full list of policy options. They then make individual selections across all seven areas, keeping within the 14-unit budget. This phase allows players to:
+	•	Clarify their values and priorities
+	•	Notice where they are more pragmatic or idealistic
+	•	Begin to understand the emotional and political weight of the trade-offs
+These individual decisions are not final but serve as a foundation for group negotiations.
+E. Phase II: Group Discussion and Consensus
+After individual decisions are complete, players discuss their choices in a small group and work together to construct a final team policy package. During this phase, participants must:
+	•	Justify their earlier decisions
+	•	Debate and negotiate conflicting priorities
+	•	Compromise to reach consensus within the 14-unit limit
+This stage is where the human dynamics of policymaking come to life: persuasion, silence, concession, power, conflict. It also mirrors how refugee policies are typically developed—not in isolation, but through coalition, pressure, and politics.
+F. Phase III: Reflection and Debriefing
+Following the final group decision, participants enter the most important part of the game: the reflection phase. Here, they are invited to deeply explore:
+	•	What emotions did you feel during the game? Frustration? Guilt? Complicity?
+	•	Who gained and who lost from your final decisions?
+	•	What compromises did you make? Were they justified?
+	•	What would justice require that the game structure didn’t allow?
+	•	Did you notice any parallels to real life—in your school, your country, or your professional work?
+	•	How did the budget constraint affect your imagination?
+	•	What assumptions about refugees and education were challenged or reinforced?
+	•	Whose voices did you amplify or ignore?
+This reflective work is supported by questions designed to make visible the moral, emotional, and political dimensions of policymaking. It is also where new possibilities emerge: the potential to reimagine refugee education not just as a problem to be managed but as a system to be transformed.
+IV. The AI Version of the CHALLENGE Game
+In the AI version of the CHALLENGE game, the core principles and structure of the physical version are preserved, but technology is used to expand immersion, access, and dynamic engagement. The gameplay consists of three phases, mirroring the original design, and is played by five individuals—one real human participant and four AI-generated agents.
+1. Agent Composition and Identity Parameters The four AI agents are created anew for each game. They each have distinct profiles, including:
+	•	Age
+	•	Educational level
+	•	Occupation
+	•	Socioeconomic status
+	•	Political stance (e.g., conservative, moderate, socialist, neoliberal, liberal, etc.)
+To preserve dignity and avoid essentialism, AI agents will not be assigned race, ethnicity, gender, or sexual orientation. Each agent's political and social attributes will shape their decision-making behaviors and arguments in the group phase.
+2. Phase I: Individual Decision-Making (20 minutes) The real participant will begin the game by reading the Republic of Bean story, becoming familiar with the scenario, and selecting one policy option in each of the seven areas while remaining within the 14-unit budget. The interface will display their remaining budget throughout.
+3. Phase II: Group Discussion with AI Agents (30 minutes) In this phase, the real participant engages in real-time dialogue with the four AI agents. The system must:
+	•	Enable voice-based interaction for the real participant
+	•	Allow the AI agents to provide arguments, question, persuade, or challenge ideas based on their policy preferences and profiles
+	•	Reflect realistic dynamics of negotiation, including moments of disagreement, alliance, compromise, and silence
+4. Phase III: Reflection and Evaluation The final stage includes:
+	•	A series of reflective questions prompted to the real participant based on the discussion that just occurred
+	•	AI-generated analysis of the participant’s decision-making process
+	•	A written evaluation of the team’s final policy package, with commentary on equity, justice, coherence, and trade-offs
+The goal is to support critical reflection and deepen the participant’s awareness of the ethical dimensions of refugee education policymaking.
+Important Requirements and Design Ethics
+	•	Strict Budget Limit: The 14-unit budget must be visible on screen, dynamically updating with each selection.
+	•	Advocacy Purpose: The game is not a neutral tool. It must never promote anti-migrant or xenophobic sentiments. It exists to amplify refugee rights and foster justice-oriented dialogue.
+	•	Avoid Tokenism: The AI agents must not become caricatures or simplified stereotypes of political ideologies. They must reflect complexity, internal conflict, and growth potential.
+	•	Maintain Educational Integrity: The AI game must remain grounded in its original purpose: education, advocacy, and ethical transformation.
+The AI CHALLENGE game is not an entertainment simulation. It is a vehicle for awakening, dialogue, and rethinking. It is an entry point into the complexities of inclusion, responsibility, and policymaking under constraint. And just like its physical version, it is designed not just to simulate change—but to inspire it.
+Welcome to the digital Republic of Bean. Let your imagination serve justice.
+

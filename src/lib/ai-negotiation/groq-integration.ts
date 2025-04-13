@@ -1,0 +1,128 @@
+import { AgentStance } from '@/types/agents';
+import { PolicyWithArea, SentimentType, GroqRequestParams } from './shared-types';
+
+/**
+ * Generates a response using the Groq API based on agent, policies, and sentiment
+ * @param params Object containing agent details, selected policies, and sentiment
+ * @returns Generated response text
+ */
+export const generateGroqResponse = async (params: GroqRequestParams): Promise<string> => {
+  const { agentName, agentStance, selectedPolicies, sentiment, conversationContext } = params;
+  
+  // Create a prompt for the Groq API
+  const prompt = createGroqPrompt(agentName, agentStance, selectedPolicies, sentiment, conversationContext);
+  
+  try {
+    // Check if API key is available
+    if (!process.env.NEXT_PUBLIC_GROQ_API_KEY) {
+      throw new Error('Groq API key is not configured');
+    }
+    
+    // Make API request to Groq - using the correct endpoint
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama3-8b-8192', // Using Llama 3 model
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an AI agent in a refugee policy simulation game. Your response should be in first person, as if you are the character speaking directly to the player.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        max_tokens: 250,
+        temperature: 0.7,
+        top_p: 0.9 // Adding top_p for better response quality
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Groq API error: ${errorData.error?.message || response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data.choices[0].message.content.trim();
+  } catch (error) {
+    console.error('Error calling Groq API:', error);
+    throw error;
+  }
+};
+
+/**
+ * Creates a prompt for the Groq API based on agent details, policies, and conversation context
+ * @param agentName Name of the agent
+ * @param agentStance Political stance of the agent
+ * @param selectedPolicies Array of selected policies
+ * @param sentiment Determined sentiment (positive, neutral, negative)
+ * @param conversationContext Previous conversation context (optional)
+ * @returns Formatted prompt string
+ */
+const createGroqPrompt = (
+  agentName: string,
+  agentStance: AgentStance,
+  selectedPolicies: PolicyWithArea[],
+  sentiment: SentimentType,
+  conversationContext?: string
+): string => {
+  // Get agent personality based on stance
+  const agentPersonality = getAgentPersonality(agentStance);
+  
+  // Format selected policies for the prompt
+  const policiesText = selectedPolicies.map(policy => {
+    return `- ${policy.title} (${policy.area}): ${policy.description} [Tier ${policy.tier}]`;
+  }).join('\n');
+  
+  // Add conversation context if available
+  const contextSection = conversationContext ? `
+    Recent conversation history:
+    ${conversationContext}
+  ` : '';
+  
+  // Combine all elements into a comprehensive prompt
+  return `
+    You are ${agentName}, a stakeholder in the Republic of Bean refugee education policy simulation.
+    
+    Your personality: ${agentPersonality}
+    
+    Your political stance: ${agentStance}
+    
+    You are reviewing the following education policies that have been selected:
+    ${policiesText}
+    
+    Based on your political stance and personality, you feel ${sentiment} about these policies.
+    
+    ${contextSection}
+    
+    Please respond as ${agentName} with your thoughts on these policy selections. Your response should be 2-3 sentences, conversational in tone, and reflect your stance and sentiment.
+    
+    Important: Do not mention your political stance directly. Speak naturally as the character would in a real conversation. If responding to a specific point in the conversation, make your response contextually relevant.
+  `;
+};
+
+/**
+ * Returns a personality description based on agent stance
+ * @param stance Political stance of the agent
+ * @returns Personality description
+ */
+const getAgentPersonality = (stance: AgentStance): string => {
+  switch (stance) {
+    case AgentStance.NEOLIBERAL:
+      return 'You prioritize economic efficiency and fiscal responsibility. You prefer market-based solutions and are concerned about the long-term financial sustainability of policies.';
+    case AgentStance.PROGRESSIVE:
+      return 'You advocate for social justice and equity. You believe in comprehensive support systems and are willing to invest significant resources to ensure equal opportunities for all.';
+    case AgentStance.MODERATE:
+      return 'You seek balanced approaches that consider multiple perspectives. You value pragmatic solutions that address immediate needs while being mindful of constraints.';
+    case AgentStance.HUMANITARIAN:
+      return 'You prioritize human welfare above all else. You believe in the moral obligation to provide comprehensive support to vulnerable populations regardless of cost.';
+    default:
+      return 'You are a thoughtful stakeholder with balanced views on refugee education policy.';
+  }
+};

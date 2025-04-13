@@ -11,6 +11,7 @@ import ReflectionPrompt from '@/components/ReflectionPrompt';
 import AIAgent from '@/components/AIAgent';
 import BudgetIndicator from '@/components/BudgetIndicator';
 import OnboardingView from '@/components/OnboardingView';
+import ConversationManager from '@/components/ConversationManager';
 import { POLICY_AREAS } from '@/data/game-data';
 import { REFLECTION_QUESTIONS } from '@/data/reflection-questions';
 import { AI_AGENTS } from '@/data/game-data';
@@ -239,28 +240,83 @@ export default function Home() {
           
           {/* Stakeholder Negotiation Tab */}
           <TabsContent value="negotiation" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* AI Agents would be rendered here */}
-              <AIAgent 
-                name="Minister Santos" 
-                stance={AgentStance.NEOLIBERAL}
-                onInteract={() => handleAgentInteraction("Minister Santos")}
-              />
-              <AIAgent 
-                name="Dr. Chen" 
-                stance={AgentStance.PROGRESSIVE}
-                onInteract={() => handleAgentInteraction("Dr. Chen")}
-              />
-              <AIAgent 
-                name="Mayor Okonjo" 
-                stance={AgentStance.MODERATE}
-                onInteract={() => handleAgentInteraction("Mayor Okonjo")}
-              />
-              <AIAgent 
-                name="Community Leader Patel" 
-                stance={AgentStance.HUMANITARIAN}
-                onInteract={() => handleAgentInteraction("Community Leader Patel")}
-              />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Main conversation area */}
+              <div className="lg:col-span-2">
+                <ConversationManager
+                  selectedPolicies={getSelectedPolicyObjects()}
+                  agents={[
+                    {
+                      name: "Minister Santos",
+                      stance: AgentStance.NEOLIBERAL,
+                      role: "Education Minister",
+                      age: 52,
+                      concerns: ["Budget constraints", "Economic impact"]
+                    },
+                    {
+                      name: "Dr. Chen",
+                      stance: AgentStance.PROGRESSIVE,
+                      role: "Education Researcher",
+                      age: 45,
+                      concerns: ["Equity", "Inclusion", "Cultural sensitivity"]
+                    },
+                    {
+                      name: "Mayor Okonjo",
+                      stance: AgentStance.MODERATE,
+                      role: "City Mayor",
+                      age: 48,
+                      concerns: ["Community integration", "Balanced approach"]
+                    },
+                    {
+                      name: "Community Leader Patel",
+                      stance: AgentStance.HUMANITARIAN,
+                      role: "Refugee Advocate",
+                      age: 39,
+                      concerns: ["Trauma-informed care", "Child welfare", "Human rights"]
+                    }
+                  ]}
+                  onConversationUpdate={setNegotiationLogs}
+                />
+              </div>
+              
+              {/* Policy summary sidebar */}
+              <div className="bg-white rounded-lg shadow-sm p-4">
+                <h3 className="font-bebas text-xl mb-3">Your Selected Policies</h3>
+                <div className="space-y-2">
+                  {getSelectedPolicyObjects().length > 0 ? (
+                    getSelectedPolicyObjects().map((policy) => (
+                      <div key={policy.id} className="border rounded p-2 text-sm">
+                        <div className="font-medium">{policy.title}</div>
+                        <div className="text-xs text-gray-500">{policy.area} • Tier {policy.tier}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-gray-500">No policies selected yet</p>
+                  )}
+                </div>
+                
+                <div className="mt-4 pt-4 border-t">
+                  <h4 className="font-medium mb-2">Stakeholder Profiles</h4>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                      <span><strong>Minister Santos:</strong> Neoliberal, concerned with economic impact</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      <span><strong>Dr. Chen:</strong> Progressive, advocates for equity and inclusion</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                      <span><strong>Mayor Okonjo:</strong> Moderate, seeks balanced solutions</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                      <span><strong>Community Leader Patel:</strong> Humanitarian, prioritizes refugee welfare</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </TabsContent>
           

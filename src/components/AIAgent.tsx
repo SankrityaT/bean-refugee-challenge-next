@@ -1,26 +1,38 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mic, MicOff } from "lucide-react";
+import { Mic, MicOff, Pause, Play } from "lucide-react";
 import { AIAgentProps, AgentStance } from '@/types/agents';
 import VoiceVisualizer from './VoiceVisualizer';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { generateAgentResponse } from '@/lib/ai-negotiation/agent-engine';
+import { EmotionType, PolicyWithArea } from '@/lib/ai-negotiation/shared-types';
+import { speakWithEmotion, pauseHumeSpeech, resumeHumeSpeech } from '@/lib/voice-engine/hume-integration';
+import { startSpeechRecognition, stopSpeechRecognition, isSpeechRecognitionSupported } from '@/lib/voice-engine/voice-utils';
 
-// Enhanced AIAgent component with speaking animations
-const AIAgent: React.FC<Partial<AIAgentProps>> = ({ 
+// Enhanced AIAgent component with speaking animations and AI integration
+const AIAgent: React.FC<Partial<AIAgentProps> & { selectedPolicies?: PolicyWithArea[] }> = ({ 
   name = "Agent", 
   stance = AgentStance.MODERATE,
   role = "Stakeholder",
   age = 45,
   concerns = ["Education access", "Resource allocation"],
+  selectedPolicies = [],
   onInteract = () => console.log("Agent interaction")
 }) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [userMuted, setUserMuted] = useState(false);
-  const [emotion, setEmotion] = useState<'neutral' | 'anger' | 'compassion' | 'frustration'>('neutral');
+  const [emotion, setEmotion] = useState<EmotionType>('neutral');
   const [message, setMessage] = useState("");
+  const [userInput, setUserInput] = useState("");
+  const [speechSupported, setSpeechSupported] = useState(true);
+  
+  // Reference to track if component is mounted
+  const isMounted = useRef(true);
   
   const getStanceColor = (stance: AgentStance) => {
     switch(stance) {
@@ -37,23 +49,75 @@ const AIAgent: React.FC<Partial<AIAgentProps>> = ({
     }
   };
   
-  const getEmotionBasedOnStance = () => {
-    const emotions = {
-      [AgentStance.NEOLIBERAL]: ['neutral', 'frustration'],
-      [AgentStance.PROGRESSIVE]: ['compassion', 'enthusiasm'],
-      [AgentStance.MODERATE]: ['neutral', 'concern'],
-      [AgentStance.HUMANITARIAN]: ['compassion', 'concern']
-    };
+  // Check if speech recognition is supported on component mount
+  useEffect(() => {
+    setSpeechSupported(isSpeechRecognitionSupported());
     
-    const stanceEmotions = emotions[stance] || ['neutral'];
-    return stanceEmotions[Math.floor(Math.random() * stanceEmotions.length)] as 'neutral' | 'anger' | 'compassion' | 'frustration';
+    // Cleanup function to run on unmount
+    return () => {
+      isMounted.current = false;
+      stopSpeechRecognition();
+      if (isSpeaking) {
+        pauseHumeSpeech();
+      }
+    };
+  }, []);
+
+  /**
+   * Generate a response using the AI negotiation system
+   */
+  const generateResponse = async () => {
+    setIsSpeaking(true);
+    setIsPaused(false);
+    
+    try {
+      // Generate response using the agent-engine
+      const response = await generateAgentResponse(
+        name,
+        stance,
+        selectedPolicies
+      );
+      
+      if (isMounted.current) {
+        setMessage(response.message);
+        setEmotion(response.emotion);
+        
+        // Use Hume AI to speak with emotion
+        await speakWithEmotion(
+          response.message,
+          name,
+          response.emotion,
+          () => console.log("Started speaking"),
+          () => {
+            if (isMounted.current) {
+              setIsSpeaking(false);
+              onInteract();
+            }
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error generating response:', error);
+      
+      // Fallback to simple response if AI generation fails
+      const fallbackMessage = getFallbackMessage();
+      setMessage(fallbackMessage);
+      setEmotion('neutral');
+      
+      // Simulate speaking duration
+      setTimeout(() => {
+        if (isMounted.current) {
+          setIsSpeaking(false);
+          onInteract();
+        }
+      }, 3000);
+    }
   };
   
-  const handleInteract = () => {
-    setIsSpeaking(true);
-    setEmotion(getEmotionBasedOnStance());
-    
-    // Simulate agent speaking with different messages based on stance
+  /**
+   * Get a fallback message based on agent stance if AI generation fails
+   */
+  const getFallbackMessage = () => {
     const stanceMessages = {
       [AgentStance.NEOLIBERAL]: [
         "We need to consider the economic impact of these policies.",
@@ -78,15 +142,54 @@ const AIAgent: React.FC<Partial<AIAgentProps>> = ({
     };
     
     const messages = stanceMessages[stance] || ["I'd like to discuss these policies further."];
-    setMessage(messages[Math.floor(Math.random() * messages.length)]);
+    return messages[Math.floor(Math.random() * messages.length)];
+  };
+  
+  /**
+   * Handle user interaction with the agent
+   */
+  const handleInteract = () => {
+    if (isSpeaking) {
+      // If already speaking, toggle pause/resume
+      if (isPaused) {
+        resumeHumeSpeech();
+        setIsPaused(false);
+      } else {
+        pauseHumeSpeech();
+        setIsPaused(true);
+      }
+    } else {
+      // Start a new conversation
+      generateResponse();
+    }
+  };
+  
+  /**
+   * Toggle speech recognition for user input
+   */
+  const toggleSpeechRecognition = () => {
+    if (!speechSupported) {
+      return;
+    }
     
-    // Simulate speaking duration based on message length
-    const speakingTime = Math.max(2000, message.length * 50);
-    
-    setTimeout(() => {
-      setIsSpeaking(false);
-      onInteract();
-    }, speakingTime);
+    if (isListening) {
+      stopSpeechRecognition();
+      setIsListening(false);
+    } else {
+      const success = startSpeechRecognition({
+        onStart: () => setIsListening(true),
+        onEnd: () => setIsListening(false),
+        onResult: (transcript) => setUserInput(transcript),
+        onError: (error) => {
+          console.error('Speech recognition error:', error);
+          setIsListening(false);
+        }
+      });
+      
+      if (!success) {
+        setIsListening(false);
+      }
+    }
   };
   
   return (
@@ -123,7 +226,7 @@ const AIAgent: React.FC<Partial<AIAgentProps>> = ({
         <div className="mt-4 min-h-[80px] bg-gray-50 rounded-md p-3 relative">
           {isSpeaking ? (
             <>
-              <VoiceVisualizer isActive={isSpeaking} emotion={emotion} />
+              <VoiceVisualizer isActive={isSpeaking && !isPaused} emotion={emotion} />
               <p className="text-sm mt-2 italic">{message}</p>
             </>
           ) : (
@@ -132,22 +235,39 @@ const AIAgent: React.FC<Partial<AIAgentProps>> = ({
             </p>
           )}
         </div>
+        
+        {/* User speech input display */}
+        {isListening && (
+          <div className="mt-2 p-2 bg-blue-50 rounded-md">
+            <p className="text-xs text-blue-500 mb-1">Listening...</p>
+            <p className="text-sm italic">{userInput || "Say something..."}</p>
+          </div>
+        )}
       </CardContent>
       <CardFooter className="flex justify-between">
         <Button 
-          onClick={() => setUserMuted(!userMuted)}
+          onClick={toggleSpeechRecognition}
           variant="outline"
           size="sm"
           className="w-12"
+          disabled={!speechSupported}
+          title={speechSupported ? "Toggle speech recognition" : "Speech recognition not supported"}
         >
-          {userMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+          {isListening ? <MicOff className="h-4 w-4 text-red-500" /> : <Mic className="h-4 w-4" />}
         </Button>
         <Button 
           onClick={handleInteract} 
-          disabled={isSpeaking}
+          variant={isSpeaking ? "outline" : "default"}
           className="flex-1 ml-2"
         >
-          {isSpeaking ? 'Listening...' : 'Start Discussion'}
+          {isSpeaking 
+            ? (isPaused ? <Play className="h-4 w-4 mr-2" /> : <Pause className="h-4 w-4 mr-2" />)
+            : null
+          }
+          {isSpeaking 
+            ? (isPaused ? "Resume" : "Pause") 
+            : "Start Discussion"
+          }
         </Button>
       </CardFooter>
     </Card>

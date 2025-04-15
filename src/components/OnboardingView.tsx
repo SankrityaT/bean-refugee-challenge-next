@@ -1,110 +1,156 @@
-
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Book, Play, Users, DollarSign, School, BrainCircuit, Lightbulb } from "lucide-react";
+import { InfiniteMovingCards } from "@/components/ui/infinite-moving-cards";
+import { BentoGrid, BentoGridItem } from "@/components/ui/bento-grid";
+
+// Rainbow stripe component (top + bottom)
+const RainbowStripe = () => (
+  <div className="flex w-full h-8"> 
+    <div className="flex-1 bg-[#6E1E1E]" />
+    <div className="flex-1 bg-[#FFD700]" />
+    <div className="flex-1 bg-[#1C140D]" />
+    <div className="flex-1 bg-[#388E3C]" />
+    <div className="flex-1 bg-[#42A5F5]" />
+    <div className="flex-1 bg-[#EF6C00]" />
+    <div className="flex-1 bg-[#A0522D]" />
+    <div className="flex-1 bg-[#80C9D5]" />
+    <div className="flex-1 bg-[#E148A1]" />
+  </div>
+);
+
+// Image component for headers
+const ImageHeader = ({ src, alt }: { src: string; alt: string }) => (
+  <div className="w-full h-full">
+    <img src={src} alt={alt} className="w-full h-full object-cover" />
+  </div>
+);
 
 const OnboardingView = ({ onComplete }: { onComplete: () => void }) => {
   return (
-    <div className="min-h-screen bg-policy-maroon text-white flex flex-col">
-      <div className="container mx-auto px-4 py-12 flex-1 flex flex-col items-center justify-center">
-        <div className="max-w-4xl w-full">
-          <h1 className="font-bebas text-5xl sm:text-6xl md:text-7xl lg:text-8xl tracking-wider mb-6 text-center">
-            THE CHALLENGE GAME
-          </h1>
-          
-          <p className="text-hope-turquoise text-xl md:text-2xl mb-12 text-center">
-            Creating Holistic Approaches for Learning, Liberty, and Equity in New Global Education
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            <Card className="bg-black/20 border-hope-turquoise text-white backdrop-blur-sm">
-              <CardHeader className="pb-2">
-                <School className="h-8 w-8 text-hope-turquoise mb-2" />
-                <CardTitle>Policy Making</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p>Make critical policy decisions across 7 key areas affecting refugee education.</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-black/20 border-hope-turquoise text-white backdrop-blur-sm">
-              <CardHeader className="pb-2">
-                <DollarSign className="h-8 w-8 text-hope-turquoise mb-2" />
-                <CardTitle>Budget Constraints</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p>Balance your budget of $200M while addressing critical needs and priorities.</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-black/20 border-hope-turquoise text-white backdrop-blur-sm">
-              <CardHeader className="pb-2">
-                <Users className="h-8 w-8 text-hope-turquoise mb-2" />
-                <CardTitle>Stakeholder Engagement</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p>Negotiate with different stakeholders to build consensus for your policy choices.</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-black/20 border-hope-turquoise text-white backdrop-blur-sm">
-              <CardHeader className="pb-2">
-                <BrainCircuit className="h-8 w-8 text-hope-turquoise mb-2" />
-                <CardTitle>Ethical Dilemmas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p>Confront moral dilemmas and social tensions inherent in refugee education policy.</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-black/20 border-hope-turquoise text-white backdrop-blur-sm">
-              <CardHeader className="pb-2">
-                <Book className="h-8 w-8 text-hope-turquoise mb-2" />
-                <CardTitle>Republic of Bean</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p>Navigate a fictional but deeply familiar setting shaped by historical exclusion and political instability.</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-black/20 border-hope-turquoise text-white backdrop-blur-sm">
-              <CardHeader className="pb-2">
-                <Lightbulb className="h-8 w-8 text-hope-turquoise mb-2" />
-                <CardTitle>Critical Reflection</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p>Reflect on your decisions and their implications for equity, justice, and inclusion.</p>
-              </CardContent>
-            </Card>
-          </div>
-          
-          <div className="bg-black/30 rounded-lg p-6 backdrop-blur-sm mb-8">
-            <h2 className="font-bebas text-2xl mb-3">Your Mission</h2>
-            <p className="mb-4">
-              As a member of parliament in the Republic of Bean, you must develop a comprehensive refugee education reform package. With two million refugees entering your country, you'll need to make tough decisions across seven policy domains under tight budget constraints.
-            </p>
-            <p>
-              Prepare to confront moral dilemmas, social tensions, and resource scarcity as you navigate competing demands from various stakeholders. Your choices will shape the future of education in the Republic of Bean.
+    <div className="min-h-screen bg-[#eac95d] text-white flex flex-col font-sans relative overflow-hidden">
+      <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))] opacity-30" />
+      
+      {/* 🔺 Rainbow Top Bar */}
+      <RainbowStripe />
+
+      <div className="container mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-24 flex-1 flex flex-col items-center justify-center relative z-10">
+        <div className="max-w-6xl w-full">
+          {/* White rounded rectangle background for title and subtitle */}
+          <div className="bg-white rounded-full py-8 px-8 mb-16 shadow-lg">
+            <h1 className="text-center mb-2">
+              <span className="text-[#6E1E1E] font-serif font-bold text-4xl sm:text-5xl md:text-7xl lg:text-8xl tracking-tight">C</span>
+              <span className="text-[#FFD700] font-serif font-bold text-4xl sm:text-5xl md:text-7xl lg:text-8xl tracking-tight">H</span>
+              <span className="text-[#1C140D] font-serif font-bold text-4xl sm:text-5xl md:text-7xl lg:text-8xl tracking-tight">A</span>
+              <span className="text-[#388E3C] font-serif font-bold text-4xl sm:text-5xl md:text-7xl lg:text-8xl tracking-tight">L</span>
+              <span className="text-[#42A5F5] font-serif font-bold text-4xl sm:text-5xl md:text-7xl lg:text-8xl tracking-tight">L</span>
+              <span className="text-[#EF6C00] font-serif font-bold text-4xl sm:text-5xl md:text-7xl lg:text-8xl tracking-tight">E</span>
+              <span className="text-[#A0522D] font-serif font-bold text-4xl sm:text-5xl md:text-7xl lg:text-8xl tracking-tight">N</span>
+              <span className="text-[#80C9D5] font-serif font-bold text-4xl sm:text-5xl md:text-7xl lg:text-8xl tracking-tight">G</span>
+              <span className="text-[#E148A1] font-serif font-bold text-4xl sm:text-5xl md:text-7xl lg:text-8xl tracking-tight">E</span>
+            </h1>
+            <p className="text-center text-gray-800 text-lg sm:text-xl md:text-2xl font-light">
+              Creating Holistic Approaches for Learning, Liberty, and Equity in New Global Education
             </p>
           </div>
           
-          <div className="flex justify-center">
-            <Button 
-              onClick={onComplete} 
-              className="bg-hope-turquoise text-black hover:bg-hope-turquoise/80 text-lg px-8 py-6 rounded-md animate-pulse"
-              size="lg"
+          {/* Bento grid layout - 3x2 grid with equal sizes */}
+          <div className="max-w-6xl mx-auto mb-12 sm:mb-16 md:mb-20 px-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* First row - 3 equal cards */}
+              <BentoGridItem
+                title="Policy Making"
+                description="Make critical policy decisions across 7 key areas affecting refugee education."
+                header={<ImageHeader src="/policyMaker.jpg" alt="Policy Making" />}
+              />
+              <BentoGridItem
+                title="Budget Constraints"
+                description="Balance resources effectively with a 14 units budget while addressing diverse educational needs."
+                header={<ImageHeader src="/budgetConstraints.jpg" alt="Budget Constraints" />}
+              />
+              <BentoGridItem
+                title="Stakeholder Engagement"
+                description="Negotiate with different stakeholders to build consensus for your policy choices."
+                header={<ImageHeader src="/stakeholder.jpg" alt="Stakeholder Engagement" />}
+              />
+              
+              {/* Second row - 3 equal cards */}
+              <BentoGridItem
+                title="Ethical Dilemmas"
+                description="Confront moral dilemmas and social tensions inherent in refugee education policy."
+                header={<ImageHeader src="/ethicalDilemmas.jpg" alt="Ethical Dilemmas" />}
+              />
+              <BentoGridItem
+                title="Republic of Bean"
+                description="Navigate a fictional but deeply familiar setting shaped by historical exclusion and political instability."
+                header={<ImageHeader src="/republicOfBean.jpg" alt="Republic of Bean" />}
+              />
+              <BentoGridItem
+                title="Critical Reflection"
+                description="Reflect on your decisions and their implications for equity, justice, and inclusion."
+                header={<ImageHeader src="/criticalReflection.jpg" alt="Critical Reflection" />}
+              />
+            </div>
+          </div>
+
+          <div className="relative mb-16 sm:mb-20 md:mb-24">
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-cyan-500/10 to-emerald-500/10 blur-3xl opacity-30" />
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif text-center mb-6 sm:mb-8 bg-gradient-to-r from-purple-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">Your Mission</h2>
+            
+            <div className="px-4 sm:px-0">
+              <InfiniteMovingCards
+                items={[
+                  {
+                    title: "The Challenge",
+                    description: "As a member of parliament in the Republic of Bean, you must develop a comprehensive refugee education reform package.",
+                    icon: <Play className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-400" />,
+                    gradient: "from-cyan-500 via-cyan-400 to-blue-500"
+                  },
+                  {
+                    title: "The Stakes",
+                    description: "Prepare to confront moral dilemmas, social tensions, and resource scarcity as you navigate competing demands from various stakeholders.",
+                    icon: <BrainCircuit className="h-5 w-5 sm:h-6 sm:w-6 text-purple-400" />,
+                    gradient: "from-purple-500 via-purple-400 to-pink-500"
+                  },
+                  {
+                    title: "The Impact",
+                    description: "Your choices will shape the future of education in the Republic of Bean and set precedents for refugee integration.",
+                    icon: <Users className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-400" />,
+                    gradient: "from-emerald-500 via-emerald-400 to-teal-500"
+                  },
+                  {
+                    title: "The Journey",
+                    description: "Make critical decisions across 7 key areas while balancing a $200M budget to create lasting positive change.",
+                    icon: <Book className="h-5 w-5 sm:h-6 sm:w-6 text-amber-400" />,
+                    gradient: "from-amber-500 via-amber-400 to-orange-500"
+                  }
+                ]}
+                direction="right"
+                speed="slow"
+                className="mask-gradient"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-center mt-8 sm:mt-12 md:mt-16 mb-12 sm:mb-16 md:mb-24 px-4">
+            <Button
+              onClick={onComplete}
+              className="group relative inline-flex items-center justify-center px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg font-medium tracking-wide text-white transition-all duration-500 ease-out bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full hover:scale-105 hover:shadow-xl hover:shadow-emerald-500/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:ring-offset-2 w-full sm:w-auto"
             >
-              <Play className="mr-2 h-5 w-5" />
-              Accept the Challenge
+              <span className="relative flex items-center gap-2">
+                <Play className="w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-500 group-hover:translate-x-1" />
+                <span className="relative">
+                  Accept the Challenge
+                  <span className="absolute left-0 -bottom-1 w-full h-px bg-white/50 transform origin-left scale-x-0 transition-transform duration-500 group-hover:scale-x-100" />
+                </span>
+              </span>
             </Button>
           </div>
         </div>
       </div>
-      
-      <footer className="py-4 text-center text-sm text-hope-turquoise/80">
-        A simulation for engaging with refugee education policy through critical pedagogy and participatory action research.
-      </footer>
+
+      {/* 🔻 Rainbow Bottom Bar */}
+      <RainbowStripe />
     </div>
   );
 };

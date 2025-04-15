@@ -86,3 +86,38 @@
 .font-opensans {
   font-family: 'Open Sans', system-ui, sans-serif;
 }
+
+@keyframes scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-50%));
+  }
+}
+
+@keyframes scroll-reverse {
+  from {
+    transform: translateX(calc(-50%));
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-scroll {
+  animation: scroll var(--animation-duration, 40s) linear infinite;
+}
+
+.animate-scroll-reverse {
+  animation: scroll-reverse var(--animation-duration, 40s) linear infinite;
+}
+
+.mask-gradient {
+  mask-image: linear-gradient(to right, 
+    transparent,
+    black 10%,
+    black 90%,
+    transparent
+  );
+}

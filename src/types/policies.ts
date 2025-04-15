@@ -6,7 +6,8 @@ export interface PolicyOption {
   description: string;
   impact: string;
   tier: number;
-  area?: string; // Make area an optional property
+  cost: number;
+  area?: string;
 }
 
 export interface PolicyArea {

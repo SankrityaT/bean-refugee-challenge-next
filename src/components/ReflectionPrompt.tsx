@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -6,51 +5,164 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mic, MicOff, Save } from "lucide-react";
+import { Mic, MicOff, Save, Check } from "lucide-react";
 import VoiceVisualizer from './VoiceVisualizer';
+import { toast } from "@/components/ui/use-toast";
+
+// Add TypeScript declarations for the Web Speech API
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+
+interface SpeechRecognitionResultList {
+  [index: number]: SpeechRecognitionResult;
+  length: number;
+}
+
+interface SpeechRecognitionResult {
+  [index: number]: SpeechRecognitionAlternative;
+  isFinal: boolean;
+  length: number;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  start(): void;
+  stop(): void;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+  }
+}
 
 interface ReflectionPromptProps {
   question: string;
   category: string;
+  onSave?: (questionId: string, response: string) => void;
+  questionId?: string;
+  savedResponse?: string;
 }
 
 const ReflectionPrompt: React.FC<ReflectionPromptProps> = ({ 
   question,
-  category
+  category,
+  onSave,
+  questionId = '',
+  savedResponse = ''
 }) => {
-  const [response, setResponse] = useState('');
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [response, setResponse] = useState(savedResponse || '');
+  const [isSubmitted, setIsSubmitted] = useState(!!savedResponse);
   const [isRecording, setIsRecording] = useState(false);
   const [transcription, setTranscription] = useState('');
   
-  // Mock speech recognition (in a real implementation, you'd use the Web Speech API)
-  const startRecording = () => {
-    setIsRecording(true);
-    
-    // In a real implementation, you would use the SpeechRecognition API
-    // For now, we'll simulate transcription with a timeout
-    setTimeout(() => {
-      const mockResponses = [
-        "I believe our policies tried to balance immediate needs with long-term integration goals, but we may have overlooked the cultural preservation aspect.",
-        "The budget constraints definitely limited our thinking. We focused too much on cost-effective solutions rather than transformative ones.",
-        "I think we prioritized education access but might have neglected the quality aspect in our decision-making process."
-      ];
+  // Speech recognition setup
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  
+  useEffect(() => {
+    // Initialize speech recognition
+    if (typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognitionAPI();
       
-      const newTranscription = mockResponses[Math.floor(Math.random() * mockResponses.length)];
-      setTranscription(newTranscription);
-      setResponse(prev => prev + (prev ? ' ' : '') + newTranscription);
-      setIsRecording(false);
-    }, 3000); // Simulate 3 seconds of recording
+      if (recognitionRef.current) {
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
+        
+        recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
+          let interimTranscript = '';
+          let finalTranscript = '';
+          
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript;
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+          
+          if (finalTranscript) {
+            setResponse(prev => prev + (prev ? ' ' : '') + finalTranscript);
+          }
+          setTranscription(interimTranscript);
+        };
+        
+        recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
+          console.error('Speech recognition error', event.error);
+          setIsRecording(false);
+          toast({
+            title: "Speech Recognition Error",
+            description: `Error: ${event.error}. Please try again or type your reflection.`,
+            variant: "destructive",
+          });
+        };
+      }
+    }
+    
+    // Cleanup
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+      }
+    };
+  }, []);
+  
+  const startRecording = () => {
+    if (recognitionRef.current) {
+      setIsRecording(true);
+      setTranscription('');
+      recognitionRef.current.start();
+      
+      toast({
+        title: "Recording Started",
+        description: "Speak your reflection now. Click the microphone again to stop.",
+      });
+    } else {
+      toast({
+        title: "Speech Recognition Not Available",
+        description: "Your browser doesn't support speech recognition. Please type your reflection instead.",
+        variant: "destructive",
+      });
+    }
   };
   
   const stopRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
     setIsRecording(false);
-    // In a real implementation, you would stop the SpeechRecognition here
+    setTranscription('');
   };
   
   const handleSubmit = () => {
     if (response.trim().length > 0) {
       setIsSubmitted(true);
+      
+      // Call the onSave callback if provided
+      if (onSave && questionId) {
+        onSave(questionId, response.trim());
+        
+        toast({
+          title: "Reflection Saved",
+          description: "Your reflection has been saved successfully.",
+        });
+      }
     }
   };
   
@@ -105,13 +217,22 @@ const ReflectionPrompt: React.FC<ReflectionPromptProps> = ({
             </Button>
           </>
         ) : (
-          <Button 
-            variant="outline" 
-            className="w-full"
-            onClick={() => setIsSubmitted(false)}
-          >
-            Edit Response
-          </Button>
+          <div className="w-full flex justify-between">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsSubmitted(false)}
+            >
+              Edit Response
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="text-green-600"
+              disabled
+            >
+              <Check className="h-4 w-4 mr-2" />
+              Saved
+            </Button>
+          </div>
         )}
       </CardFooter>
     </Card>

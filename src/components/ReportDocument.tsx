@@ -1,6 +1,7 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import { PolicyOption } from '@/types/policies';
+import { ReflectionData } from '@/lib/reflection-engine';
 
 // Create styles
 const styles = StyleSheet.create({
@@ -80,6 +81,20 @@ const styles = StyleSheet.create({
     color: '#666666',
     marginBottom: 3,
   },
+  reflectionAnswer: {
+    fontSize: 11,
+    marginTop: 8,
+    fontStyle: 'italic',
+    color: '#333333',
+    borderLeft: '2 solid #E0E0E0',
+    paddingLeft: 8,
+  },
+  noAnswer: {
+    fontSize: 10,
+    marginTop: 5,
+    color: '#999999',
+    fontStyle: 'italic',
+  },
   footer: {
     position: 'absolute',
     bottom: 30,
@@ -93,7 +108,7 @@ const styles = StyleSheet.create({
 
 interface ReportDocumentProps {
   policies: PolicyOption[];
-  reflectionData: any;
+  reflectionData: ReflectionData;
 }
 
 // Create Document Component
@@ -125,11 +140,18 @@ const ReportDocument: React.FC<ReportDocumentProps> = ({ policies, reflectionDat
           </View>
         ))}
         
-        <Text style={styles.subheader}>Reflection Questions</Text>
+        <Text style={styles.subheader}>Reflection Questions & Answers</Text>
         {reflectionData.questions.slice(0, 5).map((question) => (
           <View key={question.id} style={styles.reflectionQuestion}>
             <Text style={styles.reflectionCategory}>{question.category}</Text>
             <Text style={styles.text}>{question.question}</Text>
+            {reflectionData.responses && reflectionData.responses[question.id] ? (
+              <Text style={styles.reflectionAnswer}>
+                "{reflectionData.responses[question.id]}"
+              </Text>
+            ) : (
+              <Text style={styles.noAnswer}>No answer provided</Text>
+            )}
           </View>
         ))}
       </View>
@@ -143,11 +165,18 @@ const ReportDocument: React.FC<ReportDocumentProps> = ({ policies, reflectionDat
     {reflectionData.questions.length > 5 && (
       <Page size="A4" style={styles.page}>
         <View style={styles.section}>
-          <Text style={styles.subheader}>Additional Reflection Questions</Text>
+          <Text style={styles.subheader}>Additional Reflection Questions & Answers</Text>
           {reflectionData.questions.slice(5).map((question) => (
             <View key={question.id} style={styles.reflectionQuestion}>
               <Text style={styles.reflectionCategory}>{question.category}</Text>
               <Text style={styles.text}>{question.question}</Text>
+              {reflectionData.responses && reflectionData.responses[question.id] ? (
+                <Text style={styles.reflectionAnswer}>
+                  "{reflectionData.responses[question.id]}"
+                </Text>
+              ) : (
+                <Text style={styles.noAnswer}>No answer provided</Text>
+              )}
             </View>
           ))}
         </View>

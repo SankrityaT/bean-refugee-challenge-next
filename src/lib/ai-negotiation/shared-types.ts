@@ -19,4 +19,5 @@ export interface GroqRequestParams {
   selectedPolicies: PolicyWithArea[];
   sentiment: SentimentType;
   conversationContext?: string;
+  mustRespondToUser?: boolean;
 }

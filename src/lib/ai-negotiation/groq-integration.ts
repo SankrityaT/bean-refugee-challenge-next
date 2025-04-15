@@ -7,10 +7,10 @@ import { PolicyWithArea, SentimentType, GroqRequestParams } from './shared-types
  * @returns Generated response text
  */
 export const generateGroqResponse = async (params: GroqRequestParams): Promise<string> => {
-  const { agentName, agentStance, selectedPolicies, sentiment, conversationContext } = params;
+  const { agentName, agentStance, selectedPolicies, sentiment, conversationContext, mustRespondToUser } = params;
   
   // Create a prompt for the Groq API
-  const prompt = createGroqPrompt(agentName, agentStance, selectedPolicies, sentiment, conversationContext);
+  const prompt = createGroqPrompt(agentName, agentStance, selectedPolicies, sentiment, conversationContext, mustRespondToUser);
   
   try {
     // Check if API key is available
@@ -63,6 +63,7 @@ export const generateGroqResponse = async (params: GroqRequestParams): Promise<s
  * @param selectedPolicies Array of selected policies
  * @param sentiment Determined sentiment (positive, neutral, negative)
  * @param conversationContext Previous conversation context (optional)
+ * @param mustRespondToUser Whether the agent must respond to the user (optional)
  * @returns Formatted prompt string
  */
 const createGroqPrompt = (
@@ -70,7 +71,8 @@ const createGroqPrompt = (
   agentStance: AgentStance,
   selectedPolicies: PolicyWithArea[],
   sentiment: SentimentType,
-  conversationContext?: string
+  conversationContext?: string,
+  mustRespondToUser?: boolean
 ): string => {
   // Get agent personality based on stance
   const agentPersonality = getAgentPersonality(agentStance);
@@ -79,6 +81,37 @@ const createGroqPrompt = (
   const policiesText = selectedPolicies.map(policy => {
     return `- ${policy.title} (${policy.area}): ${policy.description} [Tier ${policy.tier}]`;
   }).join('\n');
+  
+  // Extract the last user message if available
+  let lastUserMessage = "";
+  let userMessageSection = "";
+  let userTitle = "Policy Advisor"; // Default title
+  
+  if (conversationContext) {
+    const contextLines = conversationContext.split('\n');
+    // Find the most recent user message
+    for (let i = contextLines.length - 1; i >= 0; i--) {
+      if (contextLines[i].includes(': ') && !contextLines[i].startsWith('Minister Santos:') && 
+          !contextLines[i].startsWith('Dr. Chen:') && !contextLines[i].startsWith('Mayor Okonjo:') && 
+          !contextLines[i].startsWith('Community Leader Patel:')) {
+        // Extract user title and message
+        const parts = contextLines[i].split(': ');
+        if (parts.length >= 2) {
+          userTitle = parts[0].split(' (')[0]; // Remove emotion part if present
+          lastUserMessage = parts.slice(1).join(': '); // Rejoin in case message contains colons
+          break;
+        }
+      }
+    }
+    
+    if (lastUserMessage) {
+      userMessageSection = `
+      The ${userTitle} has just said: "${lastUserMessage}"
+      
+      You should directly address the ${userTitle} in your response, addressing their points or questions while expressing your own perspective based on your personality and stance.
+      `;
+    }
+  }
   
   // Add conversation context if available
   const contextSection = conversationContext ? `
@@ -101,9 +134,20 @@ const createGroqPrompt = (
     
     ${contextSection}
     
-    Please respond as ${agentName} with your thoughts on these policy selections. Your response should be 2-3 sentences, conversational in tone, and reflect your stance and sentiment.
+    ${userMessageSection}
     
-    Important: Do not mention your political stance directly. Speak naturally as the character would in a real conversation. If responding to a specific point in the conversation, make your response contextually relevant.
+    ${mustRespondToUser ? 'You must respond directly to the user\'s last comment.' : ''}
+    
+    Please respond as ${agentName} with your thoughts on these policy selections and directly address what the user has said. Your response should be 2-3 sentences, conversational in tone, and reflect your stance and sentiment.
+    
+    Important guidelines:
+    1. Respond directly to the user's last comment if there is one
+    2. Express your opinion on the policies based on your stance
+    3. Do not mention your political stance directly
+    4. Speak naturally as the character would in a real conversation
+    5. Show your personality through your word choice and tone
+    6. If the user asked a question, answer it from your character's perspective
+    7. If the user expressed an opinion that conflicts with yours, politely disagree and explain why
   `;
 };
 

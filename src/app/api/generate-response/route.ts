@@ -5,7 +5,7 @@ import { PolicyWithArea } from '@/lib/ai-negotiation/shared-types';
 
 export async function POST(request: NextRequest) {
   try {
-    const { agentName, agentStance, selectedPolicies, previousMessages } = await request.json();
+    const { agentName, agentStance, selectedPolicies, previousMessages, respondToUserId } = await request.json();
     
     // Validate required parameters
     if (!agentName || !agentStance || !selectedPolicies) {
@@ -20,7 +20,8 @@ export async function POST(request: NextRequest) {
       agentName,
       agentStance as AgentStance,
       selectedPolicies as PolicyWithArea[],
-      previousMessages // Pass conversation context
+      previousMessages, // Pass conversation context
+      respondToUserId // Pass the ID of the user message to respond to
     );
     
     return NextResponse.json(response);

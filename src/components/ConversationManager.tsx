@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Send } from "lucide-react";
+import { Mic, MicOff, Send, ChevronDown, Heart, AlertTriangle, Smile, Frown, Meh } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AgentStance } from '@/types/agents';
 import { PolicyWithArea, EmotionType } from '@/lib/ai-negotiation/shared-types';
 import { startSpeechRecognition, stopSpeechRecognition, isSpeechRecognitionSupported } from '@/lib/voice-engine/voice-utils';
 import { speakWithEmotion } from '@/lib/voice-engine/hume-integration';
+import { detectEmotionsWithHume } from '@/lib/emotion-engine/hume-emotion-detection';
 import VoiceVisualizer from './VoiceVisualizer';
+import { useToast } from '@/components/ui/use-toast';
 
 interface Message {
   id: string;
@@ -16,6 +18,7 @@ interface Message {
   timestamp: Date;
   emotion?: string;
   isUser?: boolean;
+  respondingTo?: string;
 }
 
 interface ConversationManagerProps {
@@ -28,12 +31,14 @@ interface ConversationManagerProps {
     concerns: string[];
   }[];
   onConversationUpdate: (logs: any[]) => void;
+  userTitle?: string;
 }
 
 const ConversationManager: React.FC<ConversationManagerProps> = ({
   selectedPolicies,
   agents,
-  onConversationUpdate
+  onConversationUpdate,
+  userTitle = "Policy Advisor"
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState('');
@@ -43,9 +48,16 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
   const [currentEmotion, setCurrentEmotion] = useState('neutral');
   const [speechSupported, setSpeechSupported] = useState(true);
   const [userEmotion, setUserEmotion] = useState('neutral');
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const [waitingForUserResponse, setWaitingForUserResponse] = useState(false);
+  const [showFullHistory, setShowFullHistory] = useState(false);
+  
+  const { toast } = useToast();
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const conversationStarted = useRef(false);
+  const retryCountRef = useRef(0);
   
   // Check if speech recognition is supported
   useEffect(() => {
@@ -58,10 +70,11 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
       // Add welcome message
       const welcomeMessage: Message = {
         id: `system-${Date.now()}`,
-        sender: 'Facilitator',
-        content: 'Welcome to the stakeholder negotiation phase. The community leaders are ready to discuss your selected policies. You can speak or type your responses.',
+        sender: userTitle,
+        content: 'Welcome to the stakeholder negotiation phase. The community leaders are ready to discuss your selected policies. Each stakeholder will speak in turn, and you can respond after each one.',
         timestamp: new Date(),
-        emotion: 'neutral'
+        emotion: 'neutral',
+        isUser: true
       };
       
       setMessages([welcomeMessage]);
@@ -100,192 +113,132 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
   
-  const handleSendMessage = () => {
+  // Function to determine which agent should respond next
+  const getNextRespondingAgent = (allAgents: any[]): any => {
+    // Find which agents have already spoken
+    const agentsWhoSpoke = new Set(
+      messages
+        .filter(msg => !msg.isUser && allAgents.some(a => a.name === msg.sender))
+        .map(msg => msg.sender)
+    );
+    
+    // Find the next agent who hasn't spoken yet
+    const nextAgent = allAgents.find(a => !agentsWhoSpoke.has(a.name));
+    
+    // If all agents have spoken, pick a random one who hasn't spoken recently
+    if (nextAgent) {
+      return nextAgent;
+    } else {
+      // All agents have spoken at least once, pick one who hasn't spoken recently
+      // Exclude the most recent agent who spoke
+      const recentSpeakers = messages
+        .slice(-4)
+        .filter(msg => !msg.isUser)
+        .map(msg => msg.sender);
+      
+      const availableAgents = allAgents.filter(a => !recentSpeakers.includes(a.name));
+      
+      // If all agents spoke recently, pick a random one
+      const agentPool = availableAgents.length > 0 ? availableAgents : allAgents;
+      return agentPool[Math.floor(Math.random() * agentPool.length)];
+    }
+  };
+
+  // Function to handle sending user messages
+  const handleSendMessage = async () => {
     if (!userInput.trim()) return;
     
-    // Analyze user input for emotion
-    const detectedEmotion = analyzeUserEmotion(userInput);
-    setUserEmotion(detectedEmotion);
+    // Set loading state
+    const isProcessing = true;
     
-    // Add user message
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
-      sender: 'You',
-      content: userInput,
-      timestamp: new Date(),
-      emotion: detectedEmotion,
-      isUser: true
-    };
-    
-    setMessages(prev => [...prev, userMessage]);
-    setUserInput('');
-    
-    // Determine which agent should respond
-    const nextAgent = determineRespondingAgent(userInput, agents, messages);
-    
-    // Schedule agent response
-    setTimeout(() => {
-      triggerAgentResponse(nextAgent);
-    }, 1000);
-  };
-  
-  const toggleSpeechRecognition = () => {
-    if (!speechSupported) return;
-    
-    if (isListening) {
-      stopSpeechRecognition();
-      setIsListening(false);
-    } else {
-      const success = startSpeechRecognition({
-        onStart: () => setIsListening(true),
-        onEnd: () => setIsListening(false),
-        onResult: (transcript) => setUserInput(transcript),
-        onError: (error) => {
-          console.error('Speech recognition error:', error);
-          setIsListening(false);
-        }
-      });
+    try {
+      // Detect emotion from user input using Hume AI
+      const emotionResult = await detectEmotionsWithHume(userInput);
+      const detectedEmotion = emotionResult.dominantEmotion;
+      setUserEmotion(detectedEmotion);
       
-      if (!success) {
-        setIsListening(false);
+      // Add user message
+      const userMessage: Message = {
+        id: `user-${Date.now()}`,
+        sender: userTitle,
+        content: userInput,
+        timestamp: new Date(),
+        emotion: detectedEmotion,
+        isUser: true
+      };
+      
+      const updatedMessages = [...messages, userMessage];
+      setMessages(updatedMessages);
+      setUserInput('');
+      
+      // Update conversation logs
+      onConversationUpdate(updatedMessages);
+      
+      // Reset waiting for user response flag
+      setWaitingForUserResponse(false);
+      
+      // Automatically trigger a response from one of the agents after user sends a message
+      const nextAgent = getNextRespondingAgent(agents);
+      if (nextAgent) {
+        // Wait a short moment before agent responds (for natural conversation flow)
+        setTimeout(() => {
+          triggerAgentResponse(nextAgent.name, userMessage.id);
+        }, 1000);
       }
+    } catch (error) {
+      console.error('Error processing message:', error);
+      toast({
+        title: "Error",
+        description: "There was an error processing your message. Please try again.",
+        variant: "destructive",
+      });
     }
   };
   
-  // Analyze user input to detect emotion
+  // Analyze user input to detect emotion - DEPRECATED, now using Hume AI
   const analyzeUserEmotion = (text: string): string => {
-    const lowerText = text.toLowerCase();
+    // This function is kept for fallback purposes but is no longer the primary emotion detection method
+    const lowerInput = text.toLowerCase();
     
     // Simple keyword-based emotion detection
-    if (lowerText.includes('angry') || lowerText.includes('upset') || 
-        lowerText.includes('unfair') || lowerText.includes('ridiculous')) {
+    if (lowerInput.includes('angry') || lowerInput.includes('upset') || 
+        lowerInput.includes('unfair') || lowerInput.includes('ridiculous')) {
       return 'anger';
     }
     
-    if (lowerText.includes('worried') || lowerText.includes('concern') || 
-        lowerText.includes('afraid') || lowerText.includes('risk')) {
+    if (lowerInput.includes('worried') || lowerInput.includes('concern') || 
+        lowerInput.includes('afraid') || lowerInput.includes('risk')) {
       return 'concern';
     }
     
-    if (lowerText.includes('happy') || lowerText.includes('excited') || 
-        lowerText.includes('great') || lowerText.includes('excellent')) {
+    if (lowerInput.includes('happy') || lowerInput.includes('excited') || 
+        lowerInput.includes('great') || lowerInput.includes('excellent')) {
       return 'enthusiasm';
     }
     
-    if (lowerText.includes('sad') || lowerText.includes('disappointed') || 
-        lowerText.includes('unfortunate')) {
+    if (lowerInput.includes('sad') || lowerInput.includes('disappointed') || 
+        lowerInput.includes('unfortunate')) {
       return 'frustration';
     }
     
-    if (lowerText.includes('help') || lowerText.includes('support') || 
-        lowerText.includes('care') || lowerText.includes('understand')) {
+    if (lowerInput.includes('help') || lowerInput.includes('support') || 
+        lowerInput.includes('care') || lowerInput.includes('understand')) {
       return 'compassion';
     }
     
     return 'neutral';
   };
   
-  // Determine which agent should respond based on conversation context
-  const determineRespondingAgent = (userInput: string, agents: any[], messages: Message[]): string => {
-    // If the conversation just started, go in order
-    if (messages.length <= 2) {
-      return agents[0].name;
-    }
-    
-    // Content-based selection with weighted randomness
-    const agentScores: {[key: string]: number} = {};
-    
-    // Initialize scores
-    agents.forEach(agent => {
-      agentScores[agent.name] = 1; // Base score
-    });
-    
-    // Adjust scores based on who spoke recently (less likely to speak again immediately)
-    const recentSpeakers = messages
-      .slice(-3)
-      .filter(msg => !msg.isUser)
-      .map(msg => msg.sender);
-      
-    recentSpeakers.forEach(speaker => {
-      if (agentScores[speaker]) {
-        agentScores[speaker] -= 0.5; // Reduce chance for recent speakers
-      }
-    });
-    
-    // Most recent speaker is least likely to speak again
-    const lastSpeaker = messages.filter(msg => !msg.isUser).pop()?.sender;
-    if (lastSpeaker && agentScores[lastSpeaker]) {
-      agentScores[lastSpeaker] -= 0.3;
-    }
-    
-    // Content relevance boosts
-    const lowerInput = userInput.toLowerCase();
-    
-    // Economic/budget topics -> Neoliberal agent
-    if (lowerInput.includes('economic') || lowerInput.includes('cost') || lowerInput.includes('budget') || 
-        lowerInput.includes('fund') || lowerInput.includes('expense') || lowerInput.includes('tax')) {
-      const neoliberalAgent = agents.find(a => a.stance === AgentStance.NEOLIBERAL)?.name;
-      if (neoliberalAgent && agentScores[neoliberalAgent]) {
-        agentScores[neoliberalAgent] += 1.5;
-      }
-    }
-    
-    // Rights/justice/equality topics -> Progressive agent
-    if (lowerInput.includes('right') || lowerInput.includes('justice') || lowerInput.includes('equal') || 
-        lowerInput.includes('fair') || lowerInput.includes('access') || lowerInput.includes('inclusion')) {
-      const progressiveAgent = agents.find(a => a.stance === AgentStance.PROGRESSIVE)?.name;
-      if (progressiveAgent && agentScores[progressiveAgent]) {
-        agentScores[progressiveAgent] += 1.5;
-      }
-    }
-    
-    // Balance/compromise topics -> Moderate agent
-    if (lowerInput.includes('balance') || lowerInput.includes('compromise') || lowerInput.includes('middle') || 
-        lowerInput.includes('reasonable') || lowerInput.includes('practical') || lowerInput.includes('realistic')) {
-      const moderateAgent = agents.find(a => a.stance === AgentStance.MODERATE)?.name;
-      if (moderateAgent && agentScores[moderateAgent]) {
-        agentScores[moderateAgent] += 1.5;
-      }
-    }
-    
-    // Humanitarian/support topics -> Humanitarian agent
-    if (lowerInput.includes('help') || lowerInput.includes('support') || lowerInput.includes('humanitarian') || 
-        lowerInput.includes('child') || lowerInput.includes('trauma') || lowerInput.includes('care')) {
-      const humanitarianAgent = agents.find(a => a.stance === AgentStance.HUMANITARIAN)?.name;
-      if (humanitarianAgent && agentScores[humanitarianAgent]) {
-        agentScores[humanitarianAgent] += 1.5;
-      }
-    }
-    
-    // Direct mentions of agents by name
-    agents.forEach(agent => {
-      if (lowerInput.includes(agent.name.toLowerCase())) {
-        agentScores[agent.name] += 2; // Big boost if directly addressed
-      }
-    });
-    
-    // Ensure minimum score
-    Object.keys(agentScores).forEach(name => {
-      agentScores[name] = Math.max(agentScores[name], 0.1);
-    });
-    
-    // Weighted random selection
-    const totalScore = Object.values(agentScores).reduce((sum, score) => sum + score, 0);
-    let random = Math.random() * totalScore;
-    
-    for (const [name, score] of Object.entries(agentScores)) {
-      random -= score;
-      if (random <= 0) {
-        return name;
-      }
-    }
-    
-    // Fallback to random selection if something went wrong
-    return agents[Math.floor(Math.random() * agents.length)].name;
+  // Find the last user message
+  const findLastUserMessage = (messages: Message[]): Message | undefined => {
+    return messages
+      .filter(msg => msg.isUser)
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+      .shift();
   };
   
   // Trigger an agent to respond
-  const triggerAgentResponse = async (agentName: string) => {
+  const triggerAgentResponse = async (agentName: string, respondToUserId: string | null = null) => {
     setActiveAgent(agentName);
     setIsSpeaking(true);
     
@@ -294,6 +247,10 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
     if (!agent) return;
     
     try {
+      // Find the last user message to ensure the agent responds to it
+      const lastUserMessage = findLastUserMessage(messages);
+      const lastUserMessageId = respondToUserId || (lastUserMessage ? lastUserMessage.id : null);
+      
       // Generate agent response
       const response = await fetch('/api/generate-response', {
         method: 'POST',
@@ -304,7 +261,8 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
           agentName,
           agentStance: agent.stance,
           selectedPolicies,
-          previousMessages: messages.slice(-5) // Send last 5 messages for context
+          previousMessages: messages.slice(-5), // Send last 5 messages for context
+          respondToUserId: lastUserMessageId // Explicitly tell the API which message to respond to
         })
       });
       
@@ -324,7 +282,8 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
         sender: agentName,
         content: message,
         timestamp: new Date(),
-        emotion
+        emotion,
+        respondingTo: lastUserMessageId // Track which message this is responding to
       };
       
       setMessages(prev => [...prev, agentMessage]);
@@ -345,24 +304,14 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
             setIsSpeaking(false);
             setActiveAgent(null);
             
-            // Continue the conversation by triggering another agent to respond
-            // But only if there are enough messages and not right after user input
-            const lastMessage = messages[messages.length - 1];
-            const shouldContinueConversation = 
-              messages.length >= 3 && // At least a few messages exchanged
-              !lastMessage?.isUser && // Last message wasn't from user
-              Math.random() < 0.7; // 70% chance to continue conversation between agents
+            // After agent speaks, wait for user response
+            toast({
+              title: "Your turn to respond",
+              description: "Click the microphone button or type your response",
+            });
             
-            if (shouldContinueConversation) {
-              // Pick next agent, ensuring it's not the same one who just spoke
-              const availableAgents = agents.filter(a => a.name !== agentName);
-              if (availableAgents.length > 0) {
-                const nextAgent = availableAgents[Math.floor(Math.random() * availableAgents.length)].name;
-                setTimeout(() => {
-                  triggerAgentResponse(nextAgent);
-                }, 1000 + Math.random() * 2000); // Random delay between 1-3 seconds
-              }
-            }
+            // Set a flag indicating we're waiting for user response
+            setWaitingForUserResponse(true);
           }
         );
       } catch (error) {
@@ -373,24 +322,14 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
           setIsSpeaking(false);
           setActiveAgent(null);
           
-          // Continue the conversation by triggering another agent to respond
-          // But only if there are enough messages and not right after user input
-          const lastMessage = messages[messages.length - 1];
-          const shouldContinueConversation = 
-            messages.length >= 3 && // At least a few messages exchanged
-            !lastMessage?.isUser && // Last message wasn't from user
-            Math.random() < 0.7; // 70% chance to continue conversation between agents
+          // After agent speaks, wait for user response
+          toast({
+            title: "Your turn to respond",
+            description: "Click the microphone button or type your response",
+          });
           
-          if (shouldContinueConversation) {
-            // Pick next agent, ensuring it's not the same one who just spoke
-            const availableAgents = agents.filter(a => a.name !== agentName);
-            if (availableAgents.length > 0) {
-              const nextAgent = availableAgents[Math.floor(Math.random() * availableAgents.length)].name;
-              setTimeout(() => {
-                triggerAgentResponse(nextAgent);
-              }, 1000 + Math.random() * 2000); // Random delay between 1-3 seconds
-            }
-          }
+          // Set a flag indicating we're waiting for user response
+          setWaitingForUserResponse(true);
         }, speakingTime);
       }
       
@@ -409,218 +348,562 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
       };
       
       setMessages(prev => [...prev, fallbackMessage]);
+      
+      // Even with error, we still wait for user response
+      setWaitingForUserResponse(true);
     }
   };
   
-  return (
-    <div className="flex flex-col h-[600px] bg-white rounded-lg shadow-sm overflow-hidden">
-      {/* Live Debate Space Header */}
-      <div className="p-4 border-b bg-policy-maroon text-white">
-        <div className="flex justify-between items-center">
-          <h3 className="font-bebas text-2xl">LIVE POLICY DEBATE</h3>
-          <div className="flex items-center">
-            <div className="animate-pulse mr-2 h-3 w-3 bg-red-500 rounded-full"></div>
-            <span className="text-xs font-medium">LIVE</span>
-          </div>
-        </div>
-        <p className="text-sm opacity-90 mt-1">
-          Join the conversation with stakeholders. Speak freely and listen to different perspectives.
-        </p>
+  const toggleSpeechRecognition = () => {
+    if (!speechSupported) {
+      toast({
+        title: "Speech Recognition Not Supported",
+        description: "Your browser doesn't support speech recognition. Please use text input instead.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (isListening) {
+      // User manually stopped speaking
+      stopSpeechRecognition();
+      setIsListening(false);
+      setSpeechError(null);
+      
+      // Don't auto-send - let the user decide when to send
+      toast({
+        title: "Recording stopped",
+        description: "Press send when you're ready to submit your response",
+      });
+    } else {
+      // Make sure we're not speaking before starting recognition
+      if (isSpeaking) {
+        console.log('Cannot start speech recognition while agent is speaking');
+        setSpeechError('Please wait for the speaker to finish');
+        return;
+      }
+      
+      // Clear any previous error
+      setSpeechError(null);
+      
+      const success = startSpeechRecognition({
+        onStart: () => {
+          setIsListening(true);
+          setSpeechError(null);
+          console.log('Speech recognition started');
+          
+          // Show a toast to indicate recording has started
+          toast({
+            title: "Listening...",
+            description: "Speak clearly, then click the mic button again when finished",
+          });
+        },
+        onEnd: () => {
+          // Don't automatically set isListening to false
+          // This will be handled by the user clicking the mic button again
+          console.log('Speech recognition ended');
+          
+          // Don't auto-send message - let the user decide when to send
+        },
+        onResult: (transcript) => {
+          setUserInput(transcript);
+          console.log('Speech recognition result:', transcript);
+        },
+        onError: (error) => {
+          console.error('Speech recognition error:', error);
+          setIsListening(false);
+          
+          // Only show error if it's not a no-speech error (which is common and not a real error)
+          if (!error.includes('no-speech')) {
+            setSpeechError(error);
+            
+            // Show toast notification for network errors
+            if (error.includes('Network error')) {
+              toast({
+                title: "Speech Recognition Error",
+                description: "Network connection issue. Try using the text input instead.",
+                variant: "destructive",
+              });
+            }
+          }
+        }
+      });
+      
+      if (!success) {
+        console.error('Failed to start speech recognition');
+        setIsListening(false);
+        setSpeechError('Speech recognition not available');
         
-        {/* Active participants */}
-        <div className="mt-3 flex -space-x-2 overflow-hidden">
-          {agents.map(agent => (
-            <div 
-              key={agent.name} 
-              className="inline-block h-8 w-8 rounded-full ring-2 ring-white"
-              title={`${agent.name} (${agent.role})`}
-            >
-              <div className="h-full w-full rounded-full bg-gray-200 flex items-center justify-center text-policy-maroon font-medium">
-                {agent.name.substring(0, 1)}
-              </div>
-            </div>
-          ))}
-          <div className="inline-block h-8 w-8 rounded-full ring-2 ring-white">
-            <div className="h-full w-full rounded-full bg-white flex items-center justify-center text-policy-maroon font-medium">
-              You
-            </div>
-          </div>
+        toast({
+          title: "Speech Recognition Unavailable",
+          description: "Your browser may not support this feature. Try using text input instead.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+  
+  // Get emotion icon and color based on emotion type
+  const getEmotionDisplay = (emotion: string = 'neutral') => {
+    const emotionMap: Record<string, { icon: React.ReactNode; color: string; bgColor: string }> = {
+      'neutral': { 
+        icon: <Meh className="h-3 w-3 mr-1" />, 
+        color: 'text-gray-600',
+        bgColor: 'bg-gray-100'
+      },
+      'anger': { 
+        icon: <AlertTriangle className="h-3 w-3 mr-1" />, 
+        color: 'text-red-600',
+        bgColor: 'bg-red-50'
+      },
+      'compassion': { 
+        icon: <Heart className="h-3 w-3 mr-1" />, 
+        color: 'text-pink-600',
+        bgColor: 'bg-pink-50'
+      },
+      'frustration': { 
+        icon: <Frown className="h-3 w-3 mr-1" />, 
+        color: 'text-orange-600',
+        bgColor: 'bg-orange-50'
+      },
+      'enthusiasm': { 
+        icon: <Smile className="h-3 w-3 mr-1" />, 
+        color: 'text-green-600',
+        bgColor: 'bg-green-50'
+      },
+      'concern': { 
+        icon: <AlertTriangle className="h-3 w-3 mr-1" />, 
+        color: 'text-amber-600',
+        bgColor: 'bg-amber-50'
+      }
+    };
+
+    return emotionMap[emotion] || emotionMap['neutral'];
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-white rounded-lg shadow-sm overflow-hidden">
+      {/* Live Debate Section */}
+      <div className="bg-policy-maroon text-white p-3 flex justify-between items-center">
+        <h2 className="text-xl font-bold">LIVE POLICY DEBATE</h2>
+        <div className="flex items-center">
+          <div className="animate-pulse mr-2 h-3 w-3 bg-red-500 rounded-full"></div>
+          <span className="text-sm">LIVE</span>
         </div>
       </div>
       
-      {/* Live conversation area */}
-      <div className="flex-1 overflow-y-auto bg-gray-50">
-        <div className="p-4 space-y-4">
-          {messages.map((message) => (
-            <div 
-              key={message.id} 
-              className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
-            >
-              <div 
-                className={`max-w-[85%] ${
-                  message.isUser 
-                    ? 'bg-policy-maroon text-white rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl' 
-                    : 'bg-white border rounded-tl-2xl rounded-tr-2xl rounded-br-2xl shadow-sm'
-                } p-3`}
-              >
-                {!message.isUser && (
-                  <div className="flex items-center mb-2">
-                    <Avatar className="h-6 w-6 mr-2">
-                      <AvatarFallback className="bg-gray-200">
-                        {message.sender.substring(0, 1)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="font-medium text-sm">{message.sender}</div>
-                    {message.emotion && message.emotion !== 'neutral' && (
-                      <div className="ml-2 px-1.5 py-0.5 rounded-full text-xs bg-gray-100 text-gray-800">
-                        {message.emotion}
-                      </div>
-                    )}
+      {/* Five Speaker Boxes Layout */}
+      <div className="flex-1 bg-gray-50 p-3">
+        <div className="grid grid-cols-4 grid-rows-2 gap-3 h-full">
+          {/* Top Row - 4 agents */}
+          <div 
+            className={`bg-white rounded-lg shadow-sm p-3 flex flex-col ${
+              activeAgent === 'Minister Santos' ? 'ring-2 ring-policy-maroon' : ''
+            }`}
+          >
+            <div className="flex items-center mb-2">
+              <div className="flex-shrink-0 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-2">
+                M
+              </div>
+              <div>
+                <div className="font-medium text-sm">Minister Santos</div>
+                <div className="text-xs text-gray-500">Education Minister</div>
+              </div>
+              <div className="ml-auto flex flex-col items-end gap-1">
+                {activeAgent === 'Minister Santos' && (
+                  <div className="flex items-center">
+                    <div className="h-2 w-2 bg-green-500 rounded-full mr-1"></div>
+                    <span className="text-xs text-green-600">Speaking</span>
                   </div>
                 )}
-                
-                <div className="text-sm">
-                  {message.content}
-                </div>
-                
-                <div className="text-xs mt-1 opacity-70 text-right">
-                  {message.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                </div>
+                {messages.filter(msg => msg.sender === 'Minister Santos').length > 0 && (() => {
+                  const emotion = messages
+                    .filter(msg => msg.sender === 'Minister Santos')
+                    .slice(-1)[0]?.emotion || 'neutral';
+                  const { icon, color, bgColor } = getEmotionDisplay(emotion);
+                  
+                  return (
+                    <div className="flex items-center">
+                      <span className={`text-[10px] px-1.5 py-0.5 ${bgColor} ${color} rounded-full capitalize flex items-center whitespace-nowrap overflow-hidden`}>
+                        {icon}
+                        {emotion}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
-          ))}
-          <div ref={messagesEndRef} />
+            
+            <div className="flex-1 overflow-y-auto text-sm">
+              {messages
+                .filter(msg => msg.sender === 'Minister Santos')
+                .slice(-1)
+                .map(msg => (
+                  <div key={msg.id}>
+                    <div className="text-xs text-gray-500 mb-1">
+                      {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </div>
+                    <div>{msg.content}</div>
+                  </div>
+                ))}
+              {messages.filter(msg => msg.sender === 'Minister Santos').length === 0 && (
+                <div className="text-gray-400 italic">No messages yet</div>
+              )}
+            </div>
+            
+            <div className="mt-2 text-xs px-2 py-1 bg-gray-100 rounded-full self-start">
+              NEOLIBERAL
+            </div>
+          </div>
+          
+          <div 
+            className={`bg-white rounded-lg shadow-sm p-3 flex flex-col ${
+              activeAgent === 'Dr. Chen' ? 'ring-2 ring-policy-maroon' : ''
+            }`}
+          >
+            <div className="flex items-center mb-2">
+              <div className="flex-shrink-0 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-2">
+                D
+              </div>
+              <div>
+                <div className="font-medium text-sm">Dr. Chen</div>
+                <div className="text-xs text-gray-500">Education Researcher</div>
+              </div>
+              <div className="ml-auto flex flex-col items-end gap-1">
+                {activeAgent === 'Dr. Chen' && (
+                  <div className="flex items-center">
+                    <div className="h-2 w-2 bg-green-500 rounded-full mr-1"></div>
+                    <span className="text-xs text-green-600">Speaking</span>
+                  </div>
+                )}
+                {messages.filter(msg => msg.sender === 'Dr. Chen').length > 0 && (() => {
+                  const emotion = messages
+                    .filter(msg => msg.sender === 'Dr. Chen')
+                    .slice(-1)[0]?.emotion || 'neutral';
+                  const { icon, color, bgColor } = getEmotionDisplay(emotion);
+                  
+                  return (
+                    <div className="flex items-center">
+                      <span className={`text-[10px] px-1.5 py-0.5 ${bgColor} ${color} rounded-full capitalize flex items-center whitespace-nowrap overflow-hidden`}>
+                        {icon}
+                        {emotion}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto text-sm">
+              {messages
+                .filter(msg => msg.sender === 'Dr. Chen')
+                .slice(-1)
+                .map(msg => (
+                  <div key={msg.id}>
+                    <div className="text-xs text-gray-500 mb-1">
+                      {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </div>
+                    <div>{msg.content}</div>
+                  </div>
+                ))}
+              {messages.filter(msg => msg.sender === 'Dr. Chen').length === 0 && (
+                <div className="text-gray-400 italic">No messages yet</div>
+              )}
+            </div>
+            
+            <div className="mt-2 text-xs px-2 py-1 bg-gray-100 rounded-full self-start">
+              PROGRESSIVE
+            </div>
+          </div>
+          
+          <div 
+            className={`bg-white rounded-lg shadow-sm p-3 flex flex-col ${
+              activeAgent === 'Mayor Okonjo' ? 'ring-2 ring-policy-maroon' : ''
+            }`}
+          >
+            <div className="flex items-center mb-2">
+              <div className="flex-shrink-0 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-2">
+                M
+              </div>
+              <div>
+                <div className="font-medium text-sm">Mayor Okonjo</div>
+                <div className="text-xs text-gray-500">City Mayor</div>
+              </div>
+              <div className="ml-auto flex flex-col items-end gap-1">
+                {activeAgent === 'Mayor Okonjo' && (
+                  <div className="flex items-center">
+                    <div className="h-2 w-2 bg-green-500 rounded-full mr-1"></div>
+                    <span className="text-xs text-green-600">Speaking</span>
+                  </div>
+                )}
+                {messages.filter(msg => msg.sender === 'Mayor Okonjo').length > 0 && (() => {
+                  const emotion = messages
+                    .filter(msg => msg.sender === 'Mayor Okonjo')
+                    .slice(-1)[0]?.emotion || 'neutral';
+                  const { icon, color, bgColor } = getEmotionDisplay(emotion);
+                  
+                  return (
+                    <div className="flex items-center">
+                      <span className={`text-[10px] px-1.5 py-0.5 ${bgColor} ${color} rounded-full capitalize flex items-center whitespace-nowrap overflow-hidden`}>
+                        {icon}
+                        {emotion}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto text-sm">
+              {messages
+                .filter(msg => msg.sender === 'Mayor Okonjo')
+                .slice(-1)
+                .map(msg => (
+                  <div key={msg.id}>
+                    <div className="text-xs text-gray-500 mb-1">
+                      {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </div>
+                    <div>{msg.content}</div>
+                  </div>
+                ))}
+              {messages.filter(msg => msg.sender === 'Mayor Okonjo').length === 0 && (
+                <div className="text-gray-400 italic">No messages yet</div>
+              )}
+            </div>
+            
+            <div className="mt-2 text-xs px-2 py-1 bg-gray-100 rounded-full self-start">
+              MODERATE
+            </div>
+          </div>
+          
+          <div 
+            className={`bg-white rounded-lg shadow-sm p-3 flex flex-col ${
+              activeAgent === 'Community Leader Patel' ? 'ring-2 ring-policy-maroon' : ''
+            }`}
+          >
+            <div className="flex items-center mb-2">
+              <div className="flex-shrink-0 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-2">
+                C
+              </div>
+              <div>
+                <div className="font-medium text-sm">Community Leader Patel</div>
+                <div className="text-xs text-gray-500">Community Advocate</div>
+              </div>
+              <div className="ml-auto flex flex-col items-end gap-1">
+                {activeAgent === 'Community Leader Patel' && (
+                  <div className="flex items-center">
+                    <div className="h-2 w-2 bg-green-500 rounded-full mr-1"></div>
+                    <span className="text-xs text-green-600">Speaking</span>
+                  </div>
+                )}
+                {messages.filter(msg => msg.sender === 'Community Leader Patel').length > 0 && (() => {
+                  const emotion = messages
+                    .filter(msg => msg.sender === 'Community Leader Patel')
+                    .slice(-1)[0]?.emotion || 'neutral';
+                  const { icon, color, bgColor } = getEmotionDisplay(emotion);
+                  
+                  return (
+                    <div className="flex items-center">
+                      <span className={`text-[10px] px-1.5 py-0.5 ${bgColor} ${color} rounded-full capitalize flex items-center whitespace-nowrap overflow-hidden`}>
+                        {icon}
+                        {emotion}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto text-sm">
+              {messages
+                .filter(msg => msg.sender === 'Community Leader Patel')
+                .slice(-1)
+                .map(msg => (
+                  <div key={msg.id}>
+                    <div className="text-xs text-gray-500 mb-1">
+                      {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </div>
+                    <div>{msg.content}</div>
+                  </div>
+                ))}
+              {messages.filter(msg => msg.sender === 'Community Leader Patel').length === 0 && (
+                <div className="text-gray-400 italic">No messages yet</div>
+              )}
+            </div>
+            
+            <div className="mt-2 text-xs px-2 py-1 bg-gray-100 rounded-full self-start">
+              HUMANITARIAN
+            </div>
+          </div>
+          
+          {/* Bottom Row - Policy Advisor (You) */}
+          <div className="bg-policy-maroon text-white rounded-lg shadow-sm p-3 flex flex-col col-span-4">
+            <div className="flex items-center mb-2">
+              <div className="flex-shrink-0 w-8 h-8 bg-white rounded-full flex items-center justify-center mr-2 text-policy-maroon">
+                P
+              </div>
+              <div>
+                <div className="font-medium">{userTitle}</div>
+                <div className="text-xs text-white text-opacity-80">Ministry of Refugee Affairs</div>
+              </div>
+              <div className="ml-auto flex flex-col items-end gap-1">
+                {isListening && (
+                  <div className="flex items-center">
+                    <div className="h-2 w-2 bg-green-500 rounded-full mr-1"></div>
+                    <span className="text-xs text-green-600">Listening</span>
+                  </div>
+                )}
+                {messages.filter(msg => msg.isUser).length > 0 && (() => {
+                  const emotion = messages
+                    .filter(msg => msg.isUser)
+                    .slice(-1)[0]?.emotion || 'neutral';
+                  const { icon, color, bgColor } = getEmotionDisplay(emotion);
+                  
+                  return (
+                    <div className="flex items-center">
+                      <span className={`text-[10px] px-1.5 py-0.5 ${bgColor} ${color} rounded-full capitalize flex items-center whitespace-nowrap overflow-hidden`}>
+                        {icon}
+                        {emotion}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto text-sm bg-white bg-opacity-20 rounded p-2">
+              {messages
+                .filter(msg => msg.isUser)
+                .slice(-1)
+                .map(msg => (
+                  <div key={msg.id}>
+                    <div className="text-xs text-white text-opacity-70 mb-1">
+                      {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </div>
+                    <div>{msg.content}</div>
+                  </div>
+                ))}
+              {messages.filter(msg => msg.isUser).length === 0 && (
+                <div className="text-white text-opacity-70 italic">No messages yet</div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
       
-      {/* Active speakers area */}
-      <div className="p-4 bg-gray-50 border-b">
-        <div className="flex justify-between items-center mb-2">
-          <h4 className="font-medium text-sm">Active Speakers</h4>
-          <div className="text-xs text-gray-500">
-            {activeAgent && isSpeaking ? '1 person speaking' : 'Waiting for next speaker'}
-          </div>
+      {/* Full Conversation History */}
+      <div className="border-t bg-white">
+        <div className="p-2 flex justify-between items-center cursor-pointer hover:bg-gray-50" 
+             onClick={() => setShowFullHistory(prev => !prev)}>
+          <span className="text-sm font-medium">Full Conversation History</span>
+          <ChevronDown className={`h-4 w-4 transform ${showFullHistory ? 'rotate-180' : ''}`} />
         </div>
         
-        <div className="space-y-3">
-          {/* Current speaker */}
-          {activeAgent && isSpeaking ? (
-            <div className="bg-white rounded-lg p-3 border-l-4 border-policy-maroon shadow-sm animate-pulse-subtle">
-              <div className="flex items-center">
-                <Avatar className="h-10 w-10 mr-3">
-                  <AvatarFallback className="bg-policy-maroon text-white">
-                    {activeAgent.substring(0, 1)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <div className="flex items-center">
-                    <div className="font-medium">{activeAgent}</div>
-                    <div className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-800 text-xs rounded-full font-medium">SPEAKING</div>
-                    {currentEmotion && currentEmotion !== 'neutral' && (
-                      <div className="ml-2 px-1.5 py-0.5 bg-gray-100 text-gray-800 text-xs rounded-full">
-                        {currentEmotion}
-                      </div>
-                    )}
+        {showFullHistory && (
+          <div className="max-h-[200px] overflow-y-auto p-3 space-y-3" ref={messagesContainerRef}>
+            {messages.map(message => (
+              <div 
+                key={message.id} 
+                className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
+              >
+                <div 
+                  className={`max-w-[85%] ${
+                    message.isUser 
+                      ? 'bg-policy-maroon text-white rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl' 
+                      : 'bg-white border rounded-tl-2xl rounded-tr-2xl rounded-br-2xl shadow-sm'
+                  } p-3`}
+                >
+                  {!message.isUser && (
+                    <div className="flex items-center mb-2">
+                      <Avatar className="h-6 w-6 mr-2">
+                        <AvatarFallback className="bg-gray-200">
+                          {message.sender.substring(0, 1)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="font-medium text-sm">{message.sender}</div>
+                      {message.emotion && message.emotion !== 'neutral' && (
+                        <div className="ml-2 px-1.5 py-0.5 rounded-full text-xs bg-gray-100 text-gray-800">
+                          {message.emotion}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {message.isUser && (
+                    <div className="flex items-center mb-2 justify-end">
+                      <div className="font-medium text-sm">{message.sender}</div>
+                      {message.emotion && message.emotion !== 'neutral' && (
+                        <div className="ml-2 px-1.5 py-0.5 rounded-full text-xs bg-gray-700 text-white">
+                          {message.emotion}
+                        </div>
+                      )}
+                      <Avatar className="h-6 w-6 ml-2">
+                        <AvatarFallback className="bg-white text-policy-maroon font-medium">
+                          {message.sender.substring(0, 1)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
+                  )}
+                  
+                  <div className="text-sm">
+                    {message.content}
                   </div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    {agents.find(a => a.name === activeAgent)?.role}
+                  
+                  <div className="text-xs mt-1 opacity-70 text-right">
+                    {message.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                   </div>
                 </div>
               </div>
-              <div className="mt-2">
-                <VoiceVisualizer isActive={true} emotion={currentEmotion as any} intensity="high" />
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white rounded-lg p-4 border border-dashed border-gray-300 text-center text-gray-500 text-sm">
-              No one is currently speaking. Join the conversation!
-            </div>
-          )}
-          
-          {/* Next speakers queue - show 1-2 agents who will speak next */}
-          {!isSpeaking && (
-            <div className="mt-3">
-              <div className="text-xs text-gray-500 mb-2">Next in queue:</div>
-              <div className="flex space-x-2">
-                {agents
-                  .filter(agent => agent.name !== activeAgent)
-                  .slice(0, 2)
-                  .map(agent => (
-                    <div key={agent.name} className="flex items-center bg-white rounded-full px-2 py-1 border text-xs">
-                      <div className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center mr-1 text-[10px]">
-                        {agent.name.substring(0, 1)}
-                      </div>
-                      <span>{agent.name}</span>
-                    </div>
-                  ))
-                }
-              </div>
-            </div>
-          )}
-        </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
       </div>
       
-      {/* Voice control dock */}
-      <div className="sticky bottom-0 bg-white border-t shadow-lg p-3">
-        <div className="flex items-center justify-between">
+      {/* Message Input Area */}
+      <div className="border-t bg-white p-3">
+        <div className="flex items-end gap-2">
           <div className="flex-1">
-            {isListening && (
-              <div className="text-sm font-medium text-policy-maroon flex items-center">
-                <div className="animate-pulse mr-2 h-2 w-2 bg-red-500 rounded-full"></div>
-                Recording...
-              </div>
-            )}
-            
-            {!isListening && userInput && (
-              <div className="text-sm text-gray-500 truncate max-w-[200px] italic">
-                "{userInput}"
-              </div>
-            )}
+            <Textarea
+              value={userInput}
+              onChange={(e) => setUserInput(e.target.value)}
+              placeholder="Type your message here..."
+              className="resize-none border-2 focus:border-policy-maroon"
+              rows={2}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+            />
+            <div className="text-xs text-gray-500 mt-1">
+              Press Enter to send, Shift+Enter for new line
+            </div>
           </div>
           
-          <div className="flex items-center space-x-2">
-            {/* Quick reactions */}
-            <div className="flex space-x-1">
+          <div className="flex gap-2">
+            {speechSupported && (
               <Button
-                variant="outline"
-                size="sm"
-                className="rounded-full px-2"
-                onClick={() => setUserInput(prev => prev + ' I agree with that point.')}
+                variant={isListening ? "destructive" : "outline"}
+                size="icon"
+                onClick={toggleSpeechRecognition}
                 disabled={isSpeaking}
+                className="h-10 w-10 rounded-full"
+                title={isListening ? "Stop listening" : "Start voice input"}
               >
-                👍 Agree
+                {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-full px-2"
-                onClick={() => setUserInput(prev => prev + ' I disagree with that approach.')}
-                disabled={isSpeaking}
-              >
-                👎 Disagree
-              </Button>
-            </div>
+            )}
             
-            {/* Mic button */}
-            <Button 
-              variant={isListening ? "destructive" : "default"}
-              size="icon" 
-              className={`h-12 w-12 rounded-full ${isListening ? 'animate-pulse' : ''}`}
-              onClick={toggleSpeechRecognition}
-              disabled={!speechSupported || isSpeaking}
-            >
-              {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-            </Button>
-            
-            {/* Send button */}
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="h-10 w-10 rounded-full"
+            <Button
+              variant="default"
+              size="icon"
               onClick={handleSendMessage}
               disabled={!userInput.trim() || isSpeaking}
+              className="h-10 w-10 bg-policy-maroon hover:bg-policy-maroon/90 rounded-full"
             >
-              <Send className="h-4 w-4" />
+              <Send className="h-5 w-5" />
             </Button>
           </div>
         </div>
@@ -644,13 +927,6 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
           )}
         </div>
       </div>
-      
-      {/* User emotion indicator */}
-      {userEmotion !== 'neutral' && (
-        <div className="px-3 py-1 bg-gray-50 border-t text-xs text-gray-500">
-          Detected emotion: <span className="font-medium">{userEmotion}</span>
-        </div>
-      )}
     </div>
   );
 };

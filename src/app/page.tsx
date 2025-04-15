@@ -143,6 +143,27 @@ export default function Home() {
     });
   };
   
+  // Handle saving a reflection response
+  const handleSaveReflection = (questionId: string, response: string) => {
+    if (reflectionData) {
+      // Update the reflectionData with the new response
+      const updatedReflectionData = {
+        ...reflectionData,
+        responses: {
+          ...reflectionData.responses,
+          [questionId]: response
+        }
+      };
+      
+      setReflectionData(updatedReflectionData);
+      
+      toast({
+        title: "Reflection Saved",
+        description: "Your reflection has been saved and will be included in your policy report.",
+      });
+    }
+  };
+
   if (showOnboarding) {
     return <OnboardingView onComplete={handleCompleteOnboarding} />;
   }
@@ -347,11 +368,19 @@ export default function Home() {
                 
                 <div className="space-y-6">
                   <h3 className="font-bebas text-2xl">Reflection Questions</h3>
+                  <p className="text-gray-600 mb-4">
+                    Use the microphone button or type your responses to the following reflection questions.
+                    Your responses will be automatically saved when you click the "Save Reflection" button
+                    and included in your policy report PDF.
+                  </p>
                   {reflectionData.questions.map((question) => (
                     <ReflectionPrompt 
                       key={question.id}
                       question={question.question}
                       category={question.category}
+                      questionId={question.id}
+                      savedResponse={reflectionData.responses[question.id] || ''}
+                      onSave={handleSaveReflection}
                     />
                   ))}
                 </div>
@@ -370,7 +399,7 @@ export default function Home() {
             through interactive decision-making and ethical reflection.
           </p>
           <div className="mt-6 text-sm text-gray-400">
-            © 2025 CHALLENGE Game Project
+            &copy; 2025 CHALLENGE Game Project
           </div>
         </div>
       </footer>

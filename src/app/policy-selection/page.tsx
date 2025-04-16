@@ -91,7 +91,7 @@ export default function PolicySelectionPage() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         {/* Map Section */}
-        <section className="mb-10 bg-white rounded-lg shadow-sm p-6">
+        <section className="mb-10 bg-white rounded-lg shadow-md p-6">
           <h2 className="font-bebas text-3xl mb-4">Republic of Bean: Refugee Crisis</h2>
           <MapCanvas />
           <p className="text-gray-700">
@@ -102,7 +102,7 @@ export default function PolicySelectionPage() {
         </section>
         
         {/* Budget Indicator - Updated to show units instead of monetary value */}
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
+        <div className="bg-white p-4 rounded-lg shadow-md border mb-8">
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-bebas text-lg">Policy Budget</h3>
             <span className={`font-bold ${!budgetValidation.isValid ? 'text-warning-orange' : 'text-black'}`}>
@@ -118,18 +118,48 @@ export default function PolicySelectionPage() {
           />
         </div>
         
-        <h2 className="font-bebas text-3xl mt-8 mb-4">Policy Selection</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {POLICY_AREAS.map((area) => (
-            <div key={area.id} className="space-y-4">
-              <h3 className="font-bebas text-2xl flex items-center gap-2">
+        {/* Custom styling to ensure Option 2 certification card button is visible */}
+        <style jsx global>{`
+          .certification-option-2-button {
+            position: absolute !important;
+            bottom: -30px !important;
+            z-index: 9999 !important;
+          }
+        `}</style>
+        
+        <h2 className="font-bebas text-3xl mt-8 mb-6 text-policy-maroon">Policy Selection</h2>
+        
+        {/* Policy categories displayed in a non-scrolling flex container */}
+        <div className="mb-6">
+          <div className="flex flex-wrap gap-2 py-2">
+            {POLICY_AREAS.map((area) => (
+              <div 
+                key={`category-${area.id}`} 
+                className="px-4 py-2 bg-white rounded-full shadow-sm border border-gray-200 flex items-center gap-2 cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <area.icon className="h-5 w-5" />
+                <span className="whitespace-nowrap font-medium">{area.title}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Responsive grid with smooth scrolling */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 overflow-y-auto" style={{ scrollBehavior: 'smooth' }}>
+          {POLICY_AREAS.map((area, index) => (
+            <div 
+              key={area.id} 
+              id={`policy-area-${area.id}`}
+              className="bg-white rounded-lg shadow-md p-6 space-y-4 transition-all hover:shadow-lg scroll-mt-24"
+            >
+              <h3 className="font-bebas text-2xl flex items-center gap-2 text-policy-maroon border-b pb-2">
                 <area.icon className="h-6 w-6" />
                 {area.title}
               </h3>
               <p className="text-sm text-gray-600">{area.description}</p>
               
-              {/* Stacked Policy Cards */}
-              <div className="h-[30rem] relative">
+              {/* Stacked Policy Cards with adjusted container height for new card size */}
+              <div className="h-[55rem] relative">
                 <StackedPolicyCards
                   areaId={area.id}
                   areaIcon={area.icon}
@@ -142,11 +172,11 @@ export default function PolicySelectionPage() {
           ))}
         </div>
         
-        <div className="mt-8 flex justify-end">
+        <div className="mt-12 flex justify-end">
           <Button 
             onClick={handleContinue}
             disabled={!budgetValidation.isValid}
-            className="bg-policy-maroon hover:bg-opacity-90"
+            className="bg-policy-maroon hover:bg-opacity-90 text-lg px-6 py-3"
           >
             Continue to Stakeholder Negotiation
           </Button>

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Mic, MicOff, Save, Check } from "lucide-react";
 import VoiceVisualizer from './VoiceVisualizer';
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 
 // Add TypeScript declarations for the Web Speech API
 interface SpeechRecognitionEvent extends Event {

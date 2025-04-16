@@ -9,7 +9,7 @@ import { startSpeechRecognition, stopSpeechRecognition, isSpeechRecognitionSuppo
 import { speakWithEmotion } from '@/lib/voice-engine/hume-integration';
 import { detectEmotionsWithHume } from '@/lib/emotion-engine/hume-emotion-detection';
 import VoiceVisualizer from './VoiceVisualizer';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface Message {
   id: string;

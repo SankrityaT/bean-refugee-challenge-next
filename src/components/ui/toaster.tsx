@@ -1,4 +1,6 @@
-import { useToast } from "@/hooks/use-toast"
+'use client';
+
+import { useToast } from "@/hooks/use-toast"  // Fix the import path
 import {
   Toast,
   ToastClose,

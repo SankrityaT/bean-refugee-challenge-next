@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { Download, Save } from "lucide-react";
 import ReflectionPrompt from './ReflectionPrompt';
 import { ReflectionData, saveReflectionResponse, exportReflectionData } from '@/lib/reflection-engine';

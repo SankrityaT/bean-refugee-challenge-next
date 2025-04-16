@@ -304,3 +304,43 @@ export const AI_AGENTS = [
     socioeconomicStatus: 'Middle Class'
   }
 ];
+
+
+// Add the STAKEHOLDERS export
+export const STAKEHOLDERS = [
+  {
+    id: 'refugee-advocate',
+    name: 'Dr. Amina Hassan',
+    role: 'Refugee Advocate',
+    stance: AgentStance.HUMANITARIAN,
+    concerns: 'Educational access, cultural preservation, trauma support'
+  },
+  {
+    id: 'education-minister',
+    name: 'Minister James Chen',
+    role: 'Education Minister',
+    stance: AgentStance.MODERATE,
+    concerns: 'Budget constraints, educational standards, political stability'
+  },
+  {
+    id: 'local-teacher',
+    name: 'Sarah Nguyen',
+    role: 'Local Teacher',
+    stance: AgentStance.PROGRESSIVE,
+    concerns: 'Classroom integration, teacher support, curriculum adaptation'
+  },
+  {
+    id: 'parent-association',
+    name: 'Robert Okafor',
+    role: 'Parent Association Leader',
+    stance: AgentStance.NEOLIBERAL,
+    concerns: 'Educational quality, resource allocation, local student needs'
+  },
+  {
+    id: 'refugee-parent',
+    name: 'Fatima Al-Sayid',
+    role: 'Refugee Parent',
+    stance: AgentStance.HUMANITARIAN,
+    concerns: 'Child wellbeing, language barriers, cultural integration'
+  }
+];

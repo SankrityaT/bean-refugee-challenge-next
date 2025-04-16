@@ -53,18 +53,23 @@ declare global {
   }
 }
 
+// Update the props interface
 export interface ReflectionPromptProps {
   question: ReflectionQuestion;
   initialResponse: string;
   onSave: (response: string) => void;
   selectedPolicies: PolicyWithArea[];
+  feedback?: string;
+  isGeneratingFeedback?: boolean;
 }
 
 const ReflectionPrompt: React.FC<ReflectionPromptProps> = ({
   question,
   initialResponse,
   onSave,
-  selectedPolicies
+  selectedPolicies,
+  feedback,
+  isGeneratingFeedback
 }) => {
   const [response, setResponse] = useState(initialResponse);
   const [isRecording, setIsRecording] = useState(false);
@@ -218,6 +223,23 @@ const ReflectionPrompt: React.FC<ReflectionPromptProps> = ({
         {isRecording && (
           <div className="mt-2">
             <VoiceVisualizer data={audioVisualizerData} />
+          </div>
+        )}
+        
+        {/* Add the feedback display here */}
+        {feedback && (
+          <div className="mt-4">
+            <h4 className="text-sm font-semibold mb-2">AI Feedback</h4>
+            <div className="bg-gray-50 p-3 rounded-md border-l-4 border-hope-turquoise text-sm">
+              {feedback}
+            </div>
+          </div>
+        )}
+
+        {isGeneratingFeedback && (
+          <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-policy-maroon"></div>
+            Generating feedback...
           </div>
         )}
       </CardContent>

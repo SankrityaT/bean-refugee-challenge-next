@@ -24,10 +24,15 @@ export default function EthicalReflectionPage() {
     aiFeedback,
     setAiFeedback
   } = useGameContext();
-  
+
+  // All hooks at the top!
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
-  
-  // Generate reflection data when entering this page
+  const [policyFeedback, setPolicyFeedback] = useState<string | null>(null);
+  const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
+  const [questionFeedback, setQuestionFeedback] = useState<Record<string, string>>({});
+  const [isGeneratingQuestionFeedback, setIsGeneratingQuestionFeedback] = useState<Record<string, boolean>>({});
+
+  // First useEffect - for generating reflection data
   useEffect(() => {
     if (!reflectionData) {
       const selectedPolicyObjects = getSelectedPolicyObjects();
@@ -35,33 +40,75 @@ export default function EthicalReflectionPage() {
       setReflectionData(reflection);
     }
   }, []);
-  
+
+  // Second useEffect - for generating feedback
+  // MOVE THIS BEFORE ANY CONDITIONAL RETURNS
+  useEffect(() => {
+    // Only run if reflectionData exists
+    if (!reflectionData) return;
+    
+    if (!aiFeedback) {
+      generateFeedback();
+    } else {
+      setPolicyFeedback(aiFeedback);
+    }
+  }, [reflectionData, aiFeedback]);
+
   // Handle saving a reflection response
   const handleSaveReflection = (questionId: string, response: string) => {
     saveReflection(questionId, response);
+    
+    // Generate AI feedback for this specific reflection response
+    generateQuestionFeedback(questionId, response);
     
     toast({
       title: "Reflection Saved",
       description: "Your reflection has been saved and will be included in your policy report.",
     });
   };
-  
+
+  // Generate feedback for a specific reflection question response
+  const generateQuestionFeedback = async (questionId: string, response: string) => {
+    if (!response.trim()) return; // Don't generate feedback for empty responses
+    
+    setIsGeneratingQuestionFeedback(prev => ({ ...prev, [questionId]: true }));
+    
+    try {
+      // Find the question text
+      const question = reflectionData?.questions.find(q => q.id === questionId);
+      if (!question) return;
+      
+      // Call your AI service to generate feedback
+      // This is a simplified example - you'll need to implement or use your existing AI service
+      const feedback = await fetch('/api/generate-reflection-feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questionText: question.text,
+          userResponse: response,
+          selectedPolicies: getSelectedPolicyObjects(),
+        })
+      }).then(res => res.json()).then(data => data.feedback);
+      
+      // Store the feedback
+      setQuestionFeedback(prev => ({ ...prev, [questionId]: feedback }));
+    } catch (error) {
+      console.error('Error generating question feedback:', error);
+      toast({
+        title: "Feedback Error",
+        description: "Could not generate feedback for your reflection. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingQuestionFeedback(prev => ({ ...prev, [questionId]: false }));
+    }
+  };
+
   // Count completed reflections for progress tracking
   const completedReflections = reflectionData ? Object.keys(reflectionData.responses).length : 0;
   const totalReflections = reflectionData ? reflectionData.questions.length : 0;
   const completionPercentage = Math.round((completedReflections / totalReflections) * 100);
-  
-  if (!reflectionData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Loading reflection data...</p>
-      </div>
-    );
-  }
-  
-  const [policyFeedback, setPolicyFeedback] = useState<string | null>(null);
-  const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
-  
+
   // Generate policy feedback
   const generateFeedback = async () => {
     setIsLoadingFeedback(true);
@@ -81,18 +128,15 @@ export default function EthicalReflectionPage() {
       setIsLoadingFeedback(false);
     }
   };
-  
-  useEffect(() => {
-    // Generate feedback automatically when page loads if not already generated
-    if (!reflectionData) return;
-    
-    if (!aiFeedback) {
-      generateFeedback();
-    } else {
-      setPolicyFeedback(aiFeedback);
-    }
-  }, [reflectionData]);
-  
+
+  if (!reflectionData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Loading reflection data...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 font-opensans">
       {/* Header */}
@@ -187,6 +231,8 @@ export default function EthicalReflectionPage() {
                 initialResponse={reflectionData.responses[question.id] || ''}
                 onSave={(response) => handleSaveReflection(question.id, response)}
                 selectedPolicies={getSelectedPolicyObjects()}
+                feedback={questionFeedback[question.id]}
+                isGeneratingFeedback={isGeneratingQuestionFeedback[question.id]}
               />
             ))}
           </div>

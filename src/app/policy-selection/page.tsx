@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import PolicyCard from '@/components/ui/PolicyCard';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -10,6 +11,28 @@ import { POLICY_AREAS } from '@/data/game-data';
 import { calculateRemainingUnits, validateSelections } from '@/lib/budget-engine';
 import { useGameContext } from '@/context/GameContext';
 import StackedPolicyCards from '@/components/ui/StackedPolicyCards';
+
+// Function to get the background color for each category
+const getCategoryBackgroundColor = (category: string) => {
+  switch (category) {
+    case 'access':
+      return '#A0F6DA'; // Cyan Blue
+    case 'language':
+      return '#FED64D'; // Yellow
+    case 'teacher':
+      return '#EF5EFF'; // Pink
+    case 'curriculum':
+      return '#7FFF2A'; // Green
+    case 'psychosocial':
+      return '#5CCBFF'; // Red (example)
+    case 'financial':
+      return '#F46A1F'; // Blue (example)
+    case 'certification':
+      return '#A0522D'; // Orange (example)
+    default:
+      return '#FFFFFF'; // Default White
+  }
+};
 
 export default function PolicySelectionPage() {
   const router = useRouter();
@@ -73,6 +96,9 @@ export default function PolicySelectionPage() {
   // Calculate remaining budget units
   const remainingUnits = calculateRemainingUnits(getSelectedPolicyObjects());
   
+  // Add state for selected policy area
+  const [selectedArea, setSelectedArea] = useState<string | null>(null);
+  
   return (
     <div className="min-h-screen bg-gray-50 font-opensans">
       {/* Header */}
@@ -129,13 +155,21 @@ export default function PolicySelectionPage() {
         
         <h2 className="font-bebas text-3xl mt-8 mb-6 text-policy-maroon">Policy Selection</h2>
         
-        {/* Policy categories displayed in a non-scrolling flex container */}
+        {/* Update the policy categories section */}
         <div className="mb-6">
           <div className="flex flex-wrap gap-2 py-2">
             {POLICY_AREAS.map((area) => (
               <div 
                 key={`category-${area.id}`} 
-                className="px-4 py-2 bg-white rounded-full shadow-sm border border-gray-200 flex items-center gap-2 cursor-pointer hover:bg-gray-50 transition-colors"
+                className={`px-4 py-2 rounded-full shadow-sm border flex items-center gap-2 cursor-pointer transition-all duration-300 ${
+                  selectedArea === area.id 
+                    ? 'text-white border-policy-maroon' 
+                    : 'border-gray-200 hover:bg-gray-50'
+                }`}
+                style={{
+                  backgroundColor: selectedArea === area.id ? getCategoryBackgroundColor(area.id) : '#FFFFFF'
+                }}
+                onClick={() => setSelectedArea(selectedArea === area.id ? null : area.id)}
               >
                 <area.icon className="h-5 w-5" />
                 <span className="whitespace-nowrap font-medium">{area.title}</span>
@@ -143,35 +177,72 @@ export default function PolicySelectionPage() {
             ))}
           </div>
         </div>
-        
-        {/* Responsive grid with smooth scrolling */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 overflow-y-auto" style={{ scrollBehavior: 'smooth' }}>
-          {POLICY_AREAS.map((area, index) => (
-            <div 
-              key={area.id} 
-              id={`policy-area-${area.id}`}
-              className="bg-white rounded-lg shadow-md p-6 space-y-4 transition-all hover:shadow-lg scroll-mt-24"
-            >
-              <h3 className="font-bebas text-2xl flex items-center gap-2 text-policy-maroon border-b pb-2">
-                <area.icon className="h-6 w-6" />
-                {area.title}
-              </h3>
-              <p className="text-sm text-gray-600">{area.description}</p>
-              
-              {/* Stacked Policy Cards with adjusted container height for new card size */}
-              <div className="h-[55rem] relative">
-                <StackedPolicyCards
-                  areaId={area.id}
-                  areaIcon={area.icon}
-                  policies={area.policies}
-                  selectedPolicies={selectedPolicies}
-                  onSelectPolicy={handlePolicySelect}
-                />
-              </div>
+
+        {/* Update the policy cards display section */}
+        <div className="mt-8">
+          {selectedArea ? (
+            <div className="w-full">
+              {POLICY_AREAS.map((area) => (
+                area.id === selectedArea && (
+                  <div key={area.id} className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-bebas text-2xl flex items-center gap-2">
+                        <area.icon className="h-6 w-6" />
+                        {area.title}
+                      </h3>
+                    </div>
+                    
+                    {/* Horizontal policy cards layout */}
+                    <div className="grid grid-cols-3 gap-6">
+                      {area.policies.map((policy) => (
+                        <div key={policy.id} className="relative">
+                          <PolicyCard
+                            id={policy.id}
+                            title={policy.title}
+                            description={policy.description}
+                            impact={policy.impact}
+                            tier={policy.tier}
+                            icon={area.icon}
+                            category={area.id}
+                            isSelected={selectedPolicies.includes(policy.id)}
+                            onClick={() => handlePolicySelect(policy.id, policy.tier)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              ))}
             </div>
-          ))}
+          ) : (
+            // Original stacked view when no area is selected
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {POLICY_AREAS.map((area) => (
+                <div 
+                  key={area.id}
+                  className="bg-white rounded-lg shadow-md p-6 space-y-4"
+                >
+                  <h3 className="font-bebas text-2xl flex items-center gap-2 text-policy-maroon border-b pb-2">
+                    <area.icon className="h-6 w-6" />
+                    {area.title}
+                  </h3>
+                  <p className="text-sm text-gray-600">{area.description}</p>
+                  
+                  <div className="h-[55rem] relative">
+                    <StackedPolicyCards
+                      areaId={area.id}
+                      areaIcon={area.icon}
+                      policies={area.policies}
+                      selectedPolicies={selectedPolicies}
+                      onSelectPolicy={handlePolicySelect}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        
+
         <div className="mt-12 flex justify-end">
           <Button 
             onClick={handleContinue}

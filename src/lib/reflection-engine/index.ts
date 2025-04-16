@@ -1,53 +1,83 @@
-import { PolicyOption } from '../../types/policies';
-import { ReflectionQuestion, REFLECTION_QUESTIONS } from '../../data/reflection-questions';
+import { PolicyOption } from '@/types/policies';
+import { ReflectionQuestion, REFLECTION_QUESTIONS } from '@/data/reflection-questions';
 
-interface ReflectionResult {
-  questions: ReflectionQuestion[];
+export interface ReflectionData {
   equityScore: number;
+  questions: ReflectionQuestion[];
+  responses: Record<string, string>;
 }
 
 /**
- * Generates reflection questions based on policy selections
+ * Generates reflection data based on selected policies
+ * @param selectedPolicies Array of selected policy options
+ * @returns ReflectionData object with equity score and reflection questions
  */
-export const generateReflection = (selections: PolicyOption[]): ReflectionResult => {
-  // Calculate equity score based on policy impact
-  const equityScore = calculateEquityScore(selections);
+export const generateReflection = (selectedPolicies: PolicyOption[]): ReflectionData => {
+  // Calculate equity score based on selected policies
+  // This is a simplified scoring mechanism that could be enhanced
+  const equityScore = calculateEquityScore(selectedPolicies);
   
-  // Get questions based on policy selections
-  const questions = getRelevantQuestions(selections);
-  
+  // Return reflection data with questions and empty responses
   return {
-    questions,
-    equityScore
+    equityScore,
+    questions: REFLECTION_QUESTIONS,
+    responses: {}
   };
 };
 
 /**
- * Calculates an equity score based on UNESCO guidelines
- * Higher scores indicate more inclusive and transformative policies
+ * Calculates an equity score based on the selected policies
+ * Higher tiers and more diverse policy areas contribute to a higher score
+ * @param selectedPolicies Array of selected policy options
+ * @returns Equity score between 1-10
  */
-const calculateEquityScore = (selections: PolicyOption[]): number => {
-  // Map impact to score values
-  const impactScores = {
-    'Exclusionary': 1,
-    'Moderate Inclusion': 3,
-    'Transformative': 5
-  };
+const calculateEquityScore = (selectedPolicies: PolicyOption[]): number => {
+  if (!selectedPolicies || selectedPolicies.length === 0) {
+    return 0;
+  }
   
-  // Calculate average score
-  const totalScore = selections.reduce((sum, policy) => {
-    return sum + impactScores[policy.impact];
-  }, 0);
+  // Count unique policy areas
+  const uniqueAreas = new Set(selectedPolicies.map(policy => policy.area)).size;
   
-  return Math.round((totalScore / selections.length) * 10) / 10; // Round to 1 decimal place
+  // Calculate average tier level (1-3)
+  const avgTier = selectedPolicies.reduce((sum, policy) => sum + (policy.tier || 1), 0) / selectedPolicies.length;
+  
+  // Calculate raw score based on diversity and tier level
+  // More diverse policy areas and higher tiers result in higher scores
+  const rawScore = (uniqueAreas / 7) * 5 + (avgTier / 3) * 5;
+  
+  // Normalize to 1-10 scale and round to one decimal place
+  return Math.min(10, Math.max(1, Math.round(rawScore * 10) / 10));
 };
 
 /**
- * Selects relevant reflection questions based on policy choices
+ * Saves a reflection response for a specific question
+ * @param reflectionData Current reflection data
+ * @param questionId ID of the question being answered
+ * @param response User's reflection response
+ * @returns Updated reflection data with the new response
  */
-const getRelevantQuestions = (selections: PolicyOption[]): ReflectionQuestion[] => {
-  // For now, return all questions
-  // In a more advanced implementation, we could filter or prioritize questions
-  // based on the specific policies selected
-  return REFLECTION_QUESTIONS;
+export const saveReflectionResponse = (
+  reflectionData: ReflectionData,
+  questionId: string,
+  response: string
+): ReflectionData => {
+  return {
+    ...reflectionData,
+    responses: {
+      ...reflectionData.responses,
+      [questionId]: response
+    }
+  };
+};
+
+/**
+ * Exports reflection data to a downloadable format (e.g., JSON)
+ * @param reflectionData Reflection data to export
+ * @returns Blob URL for downloading the reflection data
+ */
+export const exportReflectionData = (reflectionData: ReflectionData): string => {
+  const dataStr = JSON.stringify(reflectionData, null, 2);
+  const dataBlob = new Blob([dataStr], { type: 'application/json' });
+  return URL.createObjectURL(dataBlob);
 };

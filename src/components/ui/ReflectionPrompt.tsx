@@ -8,6 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Mic, MicOff, Save, Check } from "lucide-react";
 import VoiceVisualizer from './VoiceVisualizer';
 import { toast } from "@/hooks/use-toast";
+import { PolicyWithArea } from '@/lib/ai-negotiation/shared-types';
+import { ReflectionQuestion } from '@/data/reflection-questions';
+import { PolicyOption } from '@/types/policies';
 
 // Add TypeScript declarations for the Web Speech API
 interface SpeechRecognitionEvent extends Event {
@@ -50,190 +53,222 @@ declare global {
   }
 }
 
-interface ReflectionPromptProps {
-  question: string;
-  category: string;
-  onSave?: (questionId: string, response: string) => void;
-  questionId?: string;
-  savedResponse?: string;
+export interface ReflectionPromptProps {
+  question: ReflectionQuestion;
+  initialResponse: string;
+  onSave: (response: string) => void;
+  selectedPolicies: PolicyWithArea[];
 }
 
-const ReflectionPrompt: React.FC<ReflectionPromptProps> = ({ 
+const ReflectionPrompt: React.FC<ReflectionPromptProps> = ({
   question,
-  category,
+  initialResponse,
   onSave,
-  questionId = '',
-  savedResponse = ''
+  selectedPolicies
 }) => {
-  const [response, setResponse] = useState(savedResponse || '');
-  const [isSubmitted, setIsSubmitted] = useState(!!savedResponse);
+  const [response, setResponse] = useState(initialResponse);
   const [isRecording, setIsRecording] = useState(false);
-  const [transcription, setTranscription] = useState('');
+  const [isSaved, setIsSaved] = useState(false);
+  const [audioVisualizerData, setAudioVisualizerData] = useState<number[]>([]);
   
-  // Speech recognition setup
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const microphoneStreamRef = useRef<MediaStream | null>(null);
   
+  // Check if speech recognition is supported
+  const speechRecognitionSupported = typeof window !== 'undefined' && 
+    (window.SpeechRecognition || window.webkitSpeechRecognition);
+  
+  // Initialize speech recognition
   useEffect(() => {
-    // Initialize speech recognition
-    if (typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognitionAPI();
+    if (speechRecognitionSupported) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
       
-      if (recognitionRef.current) {
-        recognitionRef.current.continuous = true;
-        recognitionRef.current.interimResults = true;
+      recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0].transcript)
+          .join('');
         
-        recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
-          let interimTranscript = '';
-          let finalTranscript = '';
-          
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-              finalTranscript += transcript;
-            } else {
-              interimTranscript += transcript;
-            }
-          }
-          
-          if (finalTranscript) {
-            setResponse(prev => prev + (prev ? ' ' : '') + finalTranscript);
-          }
-          setTranscription(interimTranscript);
-        };
-        
-        recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
-          console.error('Speech recognition error', event.error);
-          setIsRecording(false);
-          toast({
-            title: "Speech Recognition Error",
-            description: `Error: ${event.error}. Please try again or type your reflection.`,
-            variant: "destructive",
-          });
-        };
-      }
+        setResponse(prev => prev + ' ' + transcript);
+      };
+      
+      recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error('Speech recognition error:', event.error);
+        setIsRecording(false);
+      };
     }
     
-    // Cleanup
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.onresult = null;
-        recognitionRef.current.onerror = null;
-      }
+      stopRecording();
     };
   }, []);
   
-  const startRecording = () => {
-    if (recognitionRef.current) {
-      setIsRecording(true);
-      setTranscription('');
-      recognitionRef.current.start();
-      
-      toast({
-        title: "Recording Started",
-        description: "Speak your reflection now. Click the microphone again to stop.",
-      });
+  // Handle recording toggle
+  const toggleRecording = async () => {
+    if (isRecording) {
+      stopRecording();
     } else {
+      startRecording();
+    }
+  };
+  
+  // Start recording
+  const startRecording = async () => {
+    if (!recognitionRef.current) return;
+    
+    try {
+      // Start audio visualization
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      microphoneStreamRef.current = stream;
+      
+      // Set up audio context for visualization
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      source.connect(analyserRef.current);
+      
+      // Configure analyser
+      analyserRef.current.fftSize = 256;
+      const bufferLength = analyserRef.current.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      
+      // Update visualization data
+      const updateVisualization = () => {
+        if (!isRecording) return;
+        
+        analyserRef.current!.getByteFrequencyData(dataArray);
+        const normalizedData = Array.from(dataArray).map(val => val / 255);
+        setAudioVisualizerData(normalizedData);
+        
+        requestAnimationFrame(updateVisualization);
+      };
+      
+      updateVisualization();
+      
+      // Start speech recognition
+      recognitionRef.current.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
       toast({
-        title: "Speech Recognition Not Available",
-        description: "Your browser doesn't support speech recognition. Please type your reflection instead.",
-        variant: "destructive",
+        title: "Microphone Access Error",
+        description: "Could not access your microphone. Please check permissions.",
+        variant: "destructive"
       });
     }
   };
   
+  // Stop recording
   const stopRecording = () => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
+    
+    if (microphoneStreamRef.current) {
+      microphoneStreamRef.current.getTracks().forEach(track => track.stop());
+      microphoneStreamRef.current = null;
+    }
+    
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    
     setIsRecording(false);
-    setTranscription('');
+    setAudioVisualizerData([]);
   };
   
-  const handleSubmit = () => {
-    if (response.trim().length > 0) {
-      setIsSubmitted(true);
-      
-      // Call the onSave callback if provided
-      if (onSave && questionId) {
-        onSave(questionId, response.trim());
-        
-        toast({
-          title: "Reflection Saved",
-          description: "Your reflection has been saved successfully.",
-        });
-      }
-    }
+  // Handle save
+  const handleSave = () => {
+    onSave(response);
+    setIsSaved(true);
+    
+    // Reset saved indicator after 2 seconds
+    setTimeout(() => {
+      setIsSaved(false);
+    }, 2000);
   };
   
   return (
-    <Card className="transition-all duration-300 hover:shadow-md">
+    <Card className="mb-6 overflow-hidden transition-all duration-300 hover:shadow-md">
       <CardHeader className="pb-2">
-        <Badge className="w-fit mb-2 bg-reflection-yellow text-black">{category}</Badge>
-        <CardTitle className="text-lg">{question}</CardTitle>
+        <CardTitle className="text-lg font-medium flex items-center gap-2">
+          {question.question}
+          <Badge variant="outline" className="ml-2 text-xs">
+            {question.category}
+          </Badge>
+        </CardTitle>
+        <CardDescription>
+          Reflect on how your selected policies address this question
+        </CardDescription>
       </CardHeader>
+      
       <CardContent>
         <Textarea
-          placeholder="Type your reflection here or use the microphone to speak..."
-          className="min-h-[100px]"
           value={response}
           onChange={(e) => setResponse(e.target.value)}
-          disabled={isSubmitted || isRecording}
+          placeholder="Type your reflection here..."
+          className="min-h-[120px] resize-y"
         />
         
         {isRecording && (
-          <div className="mt-4 p-3 bg-gray-50 rounded-md">
-            <VoiceVisualizer 
-              isActive={isRecording} 
-              emotion="neutral" 
-              intensity="medium"
-            />
-            <p className="text-sm text-center mt-2">Listening to your reflection...</p>
-            {transcription && (
-              <p className="text-sm italic mt-2">{transcription}</p>
-            )}
+          <div className="mt-2">
+            <VoiceVisualizer data={audioVisualizerData} />
           </div>
         )}
       </CardContent>
-      <CardFooter className="flex justify-between gap-2">
-        {!isSubmitted ? (
-          <>
+      
+      <CardFooter className="flex justify-between">
+        <div>
+          {speechRecognitionSupported ? (
             <Button
               variant="outline"
-              size="icon"
-              onClick={isRecording ? stopRecording : startRecording}
-              disabled={isSubmitted}
-              className="w-12 h-10"
+              size="sm"
+              onClick={toggleRecording}
+              className={isRecording ? "bg-red-100 text-red-800" : ""}
             >
-              {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              {isRecording ? (
+                <>
+                  <MicOff className="h-4 w-4 mr-2" />
+                  Stop Recording
+                </>
+              ) : (
+                <>
+                  <Mic className="h-4 w-4 mr-2" />
+                  Record Voice
+                </>
+              )}
             </Button>
-            <Button 
-              onClick={handleSubmit} 
-              className="flex-1 bg-reflection-yellow text-black hover:bg-yellow-600"
-              disabled={response.trim().length === 0 || isRecording}
-            >
-              <Save className="h-4 w-4 mr-2" />
-              Save Reflection
+          ) : (
+            <Button variant="outline" size="sm" disabled>
+              <MicOff className="h-4 w-4 mr-2" />
+              Voice Not Supported
             </Button>
-          </>
-        ) : (
-          <div className="w-full flex justify-between">
-            <Button 
-              variant="outline" 
-              onClick={() => setIsSubmitted(false)}
-            >
-              Edit Response
-            </Button>
-            <Button 
-              variant="ghost" 
-              className="text-green-600"
-              disabled
-            >
+          )}
+        </div>
+        
+        <Button 
+          onClick={handleSave}
+          size="sm"
+          className="bg-policy-maroon text-white hover:bg-opacity-90"
+          disabled={!response.trim()}
+        >
+          {isSaved ? (
+            <>
               <Check className="h-4 w-4 mr-2" />
               Saved
-            </Button>
-          </div>
-        )}
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4 mr-2" />
+              Save Reflection
+            </>
+          )}
+        </Button>
       </CardFooter>
     </Card>
   );

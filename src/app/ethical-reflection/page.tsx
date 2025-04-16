@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -9,6 +9,10 @@ import ReflectionPrompt from '@/components/ui/ReflectionPrompt';
 import { generateReflection } from '@/lib/reflection-engine';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import ReportDocument from '@/components/ui/ReportDocument';
+import PolicyFeedback from '@/components/ui/PolicyFeedback';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { generatePolicyFeedback } from '@/lib/feedback-generator';
 
 export default function EthicalReflectionPage() {
   const router = useRouter();
@@ -16,8 +20,12 @@ export default function EthicalReflectionPage() {
     getSelectedPolicyObjects,
     reflectionData,
     setReflectionData,
-    saveReflection
+    saveReflection,
+    aiFeedback,
+    setAiFeedback
   } = useGameContext();
+  
+  const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
   
   // Generate reflection data when entering this page
   useEffect(() => {
@@ -38,6 +46,11 @@ export default function EthicalReflectionPage() {
     });
   };
   
+  // Count completed reflections for progress tracking
+  const completedReflections = reflectionData ? Object.keys(reflectionData.responses).length : 0;
+  const totalReflections = reflectionData ? reflectionData.questions.length : 0;
+  const completionPercentage = Math.round((completedReflections / totalReflections) * 100);
+  
   if (!reflectionData) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -45,6 +58,40 @@ export default function EthicalReflectionPage() {
       </div>
     );
   }
+  
+  const [policyFeedback, setPolicyFeedback] = useState<string | null>(null);
+  const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
+  
+  // Generate policy feedback
+  const generateFeedback = async () => {
+    setIsLoadingFeedback(true);
+    try {
+      const selectedPolicyObjects = getSelectedPolicyObjects();
+      const feedback = await generatePolicyFeedback(selectedPolicyObjects, reflectionData);
+      setPolicyFeedback(feedback);
+      setAiFeedback(feedback); // Store in context for later reference
+    } catch (error) {
+      console.error('Error generating feedback:', error);
+      toast({
+        title: "Feedback Error",
+        description: "Could not generate policy feedback. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingFeedback(false);
+    }
+  };
+  
+  useEffect(() => {
+    // Generate feedback automatically when page loads if not already generated
+    if (!reflectionData) return;
+    
+    if (!aiFeedback) {
+      generateFeedback();
+    } else {
+      setPolicyFeedback(aiFeedback);
+    }
+  }, [reflectionData]);
   
   return (
     <div className="min-h-screen bg-gray-50 font-opensans">
@@ -65,70 +112,103 @@ export default function EthicalReflectionPage() {
         <h2 className="font-bebas text-3xl mb-6">Ethical Reflection</h2>
         
         <div className="space-y-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <h3 className="font-bebas text-2xl mb-4">Policy Impact Assessment</h3>
-            <div className="flex items-center gap-4 mb-6">
-              <div className="text-4xl font-bold">{reflectionData.equityScore}</div>
-              <div>
-                <p className="font-semibold">Equity Score</p>
-                <p className="text-sm text-gray-600">Based on UNESCO inclusion metrics</p>
+          {/* Policy Impact Assessment Card */}
+          <Card className="bg-white transition-all duration-300 hover:shadow-md">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-2xl font-bebas">Policy Impact Assessment</CardTitle>
+              <CardDescription>
+                Your policy package has been analyzed for equity and inclusion
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-2">Equity Score</h3>
+                <div className="flex items-center gap-2">
+                  <div className="w-full bg-gray-200 rounded-full h-4">
+                    <div 
+                      className="bg-hope-turquoise h-4 rounded-full" 
+                      style={{ width: `${(reflectionData.equityScore / 5) * 100}%` }}
+                    ></div>
+                  </div>
+                  <span className="font-bold">{reflectionData.equityScore}/5</span>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  Based on UNESCO inclusion metrics for refugee education
+                </p>
               </div>
-            </div>
-            
-            <div className="mt-4">
-              <PDFDownloadLink 
-                document={<ReportDocument policies={getSelectedPolicyObjects()} reflectionData={reflectionData} />}
-                fileName="refugee-policy-report.pdf"
-                className="bg-policy-maroon text-white px-4 py-2 rounded-md hover:bg-opacity-90 transition-all"
-              >
-                {({ loading }) => loading ? 'Generating report...' : 'Download Policy Report (PDF)'}
-              </PDFDownloadLink>
+              
+              {/* AI Policy Analysis */}
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold mb-2">Policy Analysis</h3>
+                {isLoadingFeedback ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-policy-maroon"></div>
+                  </div>
+                ) : policyFeedback ? (
+                  <div className="prose max-w-none">
+                    <div className="bg-gray-50 p-4 rounded-md border-l-4 border-hope-turquoise">
+                      {policyFeedback.split('\n\n').map((paragraph, i) => (
+                        <p key={i} className={i === 0 ? "font-medium" : ""}>{paragraph}</p>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <Button onClick={generateFeedback} className="bg-policy-maroon text-white hover:bg-opacity-90">
+                    Generate Policy Analysis
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Reflection Progress */}
+          <div className="bg-white p-6 rounded-lg shadow-sm mb-6">
+            <h3 className="font-bebas text-xl mb-4">Reflection Progress</h3>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-full bg-gray-200 rounded-full h-4">
+                <div 
+                  className="bg-progress-green h-4 rounded-full" 
+                  style={{ width: `${(Object.keys(reflectionData.responses).length / reflectionData.questions.length) * 100}%` }}
+                ></div>
+              </div>
+              <span className="font-bold">
+                {Object.keys(reflectionData.responses).length}/{reflectionData.questions.length}
+              </span>
             </div>
           </div>
           
+          {/* Reflection Questions */}
           <div className="space-y-6">
             <h3 className="font-bebas text-2xl">Reflection Questions</h3>
-            <p className="text-gray-600 mb-4">
-              Use the microphone button or type your responses to the following reflection questions.
-              Your responses will be automatically saved when you click the "Save Reflection" button
-              and included in your policy report PDF.
-            </p>
             {reflectionData.questions.map((question) => (
-              <ReflectionPrompt 
+              <ReflectionPrompt
                 key={question.id}
-                question={question.question}
-                category={question.category}
-                questionId={question.id}
-                savedResponse={reflectionData.responses[question.id] || ''}
-                onSave={handleSaveReflection}
+                question={question}
+                initialResponse={reflectionData.responses[question.id] || ''}
+                onSave={(response) => handleSaveReflection(question.id, response)}
+                selectedPolicies={getSelectedPolicyObjects()}
               />
             ))}
           </div>
-        </div>
-        
-        <div className="mt-8 flex justify-end">
-          <Button 
-            onClick={() => router.push('/')}
-            className="bg-policy-maroon hover:bg-opacity-90"
-          >
-            Return to Home
-          </Button>
-        </div>
-      </main>
-      
-      {/* Footer */}
-      <footer className="bg-gray-800 text-white py-8 px-4 mt-16">
-        <div className="container mx-auto text-center">
-          <h2 className="font-bebas text-2xl mb-4">THE CHALLENGE GAME</h2>
-          <p className="text-gray-300 max-w-2xl mx-auto">
-            A simulation designed to explore the complexities of refugee education policy-making
-            through interactive decision-making and ethical reflection.
-          </p>
-          <div className="mt-6 text-sm text-gray-400">
-            &copy; 2025 CHALLENGE Game Project
+          
+          {/* Navigation Buttons */}
+          <div className="flex justify-between mt-8">
+            <Button 
+              variant="outline" 
+              onClick={() => router.push('/stakeholder-negotiation')}
+            >
+              Back to Negotiation
+            </Button>
+            
+            <Button 
+              className="bg-policy-maroon text-white hover:bg-opacity-90"
+              onClick={() => router.push('/summary')}
+            >
+              View Final Summary
+            </Button>
           </div>
         </div>
-      </footer>
+      </main>
     </div>
   );
 }

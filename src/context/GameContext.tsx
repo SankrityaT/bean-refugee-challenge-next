@@ -8,7 +8,13 @@ import { POLICY_AREAS } from '@/data/game-data';
 
 type GamePhase = 'onboarding' | 'policy-selection' | 'stakeholder-negotiation' | 'ethical-reflection';
 
-interface GameContextType {
+// Add GameProviderProps interface
+interface GameProviderProps {
+  children: React.ReactNode;
+}
+
+// Add to your GameContextType interface
+export interface GameContextType {
   // State
   selectedPolicies: string[];
   negotiationLogs: any[];
@@ -32,11 +38,14 @@ interface GameContextType {
   // Utilities
   getSelectedPolicyObjects: () => PolicyWithArea[];
   generateReflectionData: () => void;
+  aiFeedback: string | null;
+  setAiFeedback: (feedback: string | null) => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
-export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+// Then in your GameProvider component
+export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const [selectedPolicies, setSelectedPolicies] = useState<string[]>([]);
   const [negotiationLogs, setNegotiationLogs] = useState<any[]>([]);
   const [reflectionData, setReflectionData] = useState(null);
@@ -46,6 +55,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     totalUnits: 0,
     tierDiversity: false
   });
+  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
 
   // Get selected policy objects
   const getSelectedPolicyObjects = () => {
@@ -103,24 +113,26 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const contextValue = {
+    selectedPolicies,
+    negotiationLogs,
+    reflectionData,
+    budgetValidation,
+    setSelectedPolicies,
+    addSelectedPolicy,
+    removeSelectedPolicy,
+    setNegotiationLogs,
+    addNegotiationLog,
+    getSelectedPolicyObjects,
+    generateReflectionData,
+    saveReflection,
+    setReflectionData, // Added comma here
+    aiFeedback,
+    setAiFeedback,
+  };
+
   return (
-    <GameContext.Provider
-      value={{
-        selectedPolicies,
-        negotiationLogs,
-        reflectionData,
-        budgetValidation,
-        setSelectedPolicies,
-        addSelectedPolicy,
-        removeSelectedPolicy,
-        setNegotiationLogs,
-        addNegotiationLog,
-        getSelectedPolicyObjects,
-        generateReflectionData,
-        saveReflection,
-        setReflectionData // Added this missing property
-      }}
-    >
+    <GameContext.Provider value={contextValue}>
       {children}
     </GameContext.Provider>
   );

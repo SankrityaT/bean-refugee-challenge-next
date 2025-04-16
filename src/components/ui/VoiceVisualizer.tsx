@@ -6,12 +6,14 @@ interface VoiceVisualizerProps {
   isActive?: boolean;
   emotion?: EmotionType;
   intensity?: 'low' | 'medium' | 'high';
+  data?: number[]; // Add the data prop
 }
 
 const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({ 
   isActive = false,
   emotion = 'neutral',
-  intensity = 'medium'
+  intensity = 'medium',
+  data = [] // Add default empty array
 }) => {
   const getEmotionColor = () => {
     switch(emotion) {
@@ -35,21 +37,39 @@ const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({
     return `h-${baseHeight}`;
   };
 
+  // If we have data, use it for visualization instead of the default animation
+  const hasData = data.length > 0;
+
   return (
     <div className={`flex items-end justify-center ${getIntensityStyle()} gap-1 my-4`}>
-      {[1, 2, 3, 4, 5].map((barIndex) => (
-        <div
-          key={barIndex}
-          className={`w-2 h-3 rounded-t-sm ${getEmotionColor()} ${
-            isActive ? `animate-wave-${barIndex}` : 'h-1'
-          } transform-origin-bottom transition-height duration-300`}
-          style={{ 
-            animationPlayState: isActive ? 'running' : 'paused',
-            height: isActive ? undefined : '4px',
-            animationDuration: `${0.8 + (barIndex * 0.1)}s`
-          }}
-        />
-      ))}
+      {hasData ? (
+        // Render bars based on audio data
+        data.slice(0, 20).map((value, index) => (
+          <div
+            key={index}
+            className={`w-2 rounded-t-sm ${getEmotionColor()}`}
+            style={{ 
+              height: `${Math.max(4, value * 40)}px`,
+              transition: 'height 0.1s ease-in-out'
+            }}
+          />
+        ))
+      ) : (
+        // Render default animation bars
+        [1, 2, 3, 4, 5].map((barIndex) => (
+          <div
+            key={barIndex}
+            className={`w-2 h-3 rounded-t-sm ${getEmotionColor()} ${
+              isActive ? `animate-wave-${barIndex}` : 'h-1'
+            } transform-origin-bottom transition-height duration-300`}
+            style={{ 
+              animationPlayState: isActive ? 'running' : 'paused',
+              height: isActive ? undefined : '4px',
+              animationDuration: `${0.8 + (barIndex * 0.1)}s`
+            }}
+          />
+        ))
+      )}
     </div>
   );
 };

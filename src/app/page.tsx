@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Book, Play, Users, DollarSign, School, BrainCircuit, Lightbulb } from "lucide-react";
 import { InfiniteMovingCards } from "@/components/ui/infinite-moving-cards";
 import { BentoGrid, BentoGridItem } from "@/components/ui/bento-grid";
+// Remove this import as we won't need it anymore
+// import CustomScrollbar from "@/components/ui/custom-scrollbar";
 
 // Rainbow stripe component (top + bottom)
 const RainbowStripe = () => (
@@ -35,9 +37,13 @@ export default function Home() {
   const handleAcceptChallenge = () => {
     router.push('/policy-selection');
   };
+  
+  // Remove the useEffect that was for the custom scrollbar
 
   return (
     <div className="min-h-screen bg-[#eac95d] text-white flex flex-col font-sans relative overflow-hidden">
+      {/* Remove the CustomScrollbar component */}
+      
       <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))] opacity-30" />
       
       {/* 🔺 Rainbow Top Bar */}
@@ -104,47 +110,24 @@ export default function Home() {
 
           <div className="relative mb-16 sm:mb-20 md:mb-24">
             <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-cyan-500/10 to-emerald-500/10 blur-3xl opacity-30" />
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif text-center mb-6 sm:mb-8 bg-gradient-to-r from-purple-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">Your Mission</h2>
             
-            <div className="px-4 sm:px-0">
-              <InfiniteMovingCards
-                items={[
-                  {
-                    title: "The Challenge",
-                    description: "As a member of parliament in the Republic of Bean, you must develop a comprehensive refugee education reform package.",
-                    icon: <Play className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-400" />,
-                    gradient: "from-cyan-500 via-cyan-400 to-blue-500"
-                  },
-                  {
-                    title: "The Stakes",
-                    description: "Prepare to confront moral dilemmas, social tensions, and resource scarcity as you navigate competing demands from various stakeholders.",
-                    icon: <BrainCircuit className="h-5 w-5 sm:h-6 sm:w-6 text-purple-400" />,
-                    gradient: "from-purple-500 via-purple-400 to-pink-500"
-                  },
-                  {
-                    title: "The Impact",
-                    description: "Your choices will shape the future of education in the Republic of Bean and set precedents for refugee integration.",
-                    icon: <Users className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-400" />,
-                    gradient: "from-emerald-500 via-emerald-400 to-teal-500"
-                  },
-                  {
-                    title: "The Journey",
-                    description: "Make critical decisions across 7 key areas while balancing a $200M budget to create lasting positive change.",
-                    icon: <Book className="h-5 w-5 sm:h-6 sm:w-6 text-amber-400" />,
-                    gradient: "from-amber-500 via-amber-400 to-orange-500"
-                  }
-                ]}
-                direction="right"
-                speed="slow"
-                className="mask-gradient"
-              />
+            {/* Fixed marquee title */}
+            <div className="overflow-hidden mb-6 sm:mb-8">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif text-center bg-gradient-to-r from-purple-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+                <div className="whitespace-nowrap inline-block animate-marquee">
+                  Your Mission — Creating positive change through thoughtful policy decisions — Your Mission
+                </div>
+              </h2>
             </div>
+            
+            {/* Mission cards section removed */}
           </div>
 
           <div className="flex justify-center mt-8 sm:mt-12 md:mt-16 mb-12 sm:mb-16 md:mb-24 px-4">
             <Button
               onClick={handleAcceptChallenge}
               className="group relative inline-flex items-center justify-center px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg font-medium tracking-wide text-white transition-all duration-500 ease-out bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full hover:scale-105 hover:shadow-xl hover:shadow-emerald-500/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:ring-offset-2 w-full sm:w-auto"
+              aria-label="Accept the Challenge"
             >
               <span className="relative flex items-center gap-2">
                 <Play className="w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-500 group-hover:translate-x-1" />
@@ -163,3 +146,27 @@ export default function Home() {
     </div>
   );
 }
+
+// Update the MissionCard component to be more responsive
+const MissionCard = ({ 
+  title, 
+  description, 
+  icon, 
+  gradient 
+}: { 
+  title: string; 
+  description: string; 
+  icon: React.ReactNode; 
+  gradient: string;
+}) => (
+  <div 
+    className={`flex-shrink-0 w-72 sm:w-80 md:w-96 p-5 rounded-xl bg-gradient-to-br ${gradient} shadow-lg`}
+    role="article"
+  >
+    <div className="flex items-center gap-2 mb-3">
+      {icon}
+      <h3 className="font-semibold text-white text-lg">{title}</h3>
+    </div>
+    <p className="text-white/90 text-sm sm:text-base">{description}</p>
+  </div>
+);

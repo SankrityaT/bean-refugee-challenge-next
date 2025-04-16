@@ -92,87 +92,21 @@ export const detectEmotionWithHumeServer = async (text: string): Promise<Emotion
     
     if (!humeResponse.ok) {
       console.error('Hume API error details:', await humeResponse.text());
-      // Fall back to stance-based emotion instead of throwing an error
-      return 'neutral';
+      return 'Neutral';
     }
     
     const humeData = await humeResponse.json();
     
-    // Extract emotions from Hume response
-    if (!humeData.dominantEmotion) {
-      return 'neutral';
-    }
+    // Log the full emotion data for debugging
+    console.log('Hume server-side emotion data:', humeData);
     
-    return humeData.dominantEmotion as EmotionType;
+    // Return the raw emotion from Hume
+    return humeData.dominantEmotion;
   } catch (error) {
     console.error('Error detecting emotions with Hume:', error);
-    // Return neutral as fallback
-    return 'neutral';
+    return 'Neutral';
   }
 };
-
-/**
- * Map Hume emotion names to our application's emotion types
- * @param humeEmotion Emotion name from Hume API
- * @returns Mapped emotion type for our application
- */
-function mapHumeEmotionToAppEmotion(humeEmotion: string): EmotionType {
-  // Mapping from Hume's emotion names to our application's emotion types
-  const emotionMap: Record<string, EmotionType> = {
-    'Neutral': 'neutral',
-    'Admiration': 'enthusiasm',
-    'Adoration': 'enthusiasm',
-    'Aesthetic Appreciation': 'enthusiasm',
-    'Amusement': 'enthusiasm',
-    'Anger': 'anger',
-    'Annoyance': 'frustration',
-    'Anxiety': 'concern',
-    'Awe': 'enthusiasm',
-    'Awkwardness': 'concern',
-    'Boredom': 'neutral',
-    'Calmness': 'neutral',
-    'Concentration': 'neutral',
-    'Confusion': 'concern',
-    'Contemplation': 'neutral',
-    'Contempt': 'anger',
-    'Contentment': 'neutral',
-    'Craving': 'enthusiasm',
-    'Determination': 'enthusiasm',
-    'Disappointment': 'frustration',
-    'Disgust': 'anger',
-    'Distress': 'concern',
-    'Doubt': 'concern',
-    'Ecstasy': 'enthusiasm',
-    'Embarrassment': 'concern',
-    'Empathic Pain': 'compassion',
-    'Enthusiasm': 'enthusiasm',
-    'Entrancement': 'enthusiasm',
-    'Envy': 'frustration',
-    'Excitement': 'enthusiasm',
-    'Fear': 'concern',
-    'Guilt': 'concern',
-    'Horror': 'concern',
-    'Interest': 'enthusiasm',
-    'Joy': 'enthusiasm',
-    'Love': 'compassion',
-    'Nostalgia': 'compassion',
-    'Pain': 'frustration',
-    'Pride': 'enthusiasm',
-    'Realization': 'neutral',
-    'Relief': 'neutral',
-    'Romance': 'compassion',
-    'Sadness': 'concern',
-    'Satisfaction': 'enthusiasm',
-    'Shame': 'concern',
-    'Surprise (negative)': 'concern',
-    'Surprise (positive)': 'enthusiasm',
-    'Sympathy': 'compassion',
-    'Tiredness': 'neutral',
-    'Triumph': 'enthusiasm'
-  };
-  
-  return emotionMap[humeEmotion] || 'neutral';
-}
 
 /**
  * Generate a response from an AI agent based on their stance, selected policies, and conversation context
@@ -211,16 +145,12 @@ export const generateAgentResponse = async (
     // Detect emotion from the generated response using Hume AI
     let emotion: EmotionType;
     try {
+      // Always use Hume's real-time emotion detection
       emotion = await detectEmotionWithHumeServer(responseMessage);
     } catch (emotionError) {
-      console.error('Error detecting emotion with Hume, falling back to stance-based emotion:', emotionError);
-      // Fallback to stance-based emotion mapping if Hume API fails
-      emotion = mapSentimentToEmotion(sentiment, agentStance);
-    }
-    
-    // If emotion detection failed and returned neutral, fall back to stance-based emotion
-    if (emotion === 'neutral') {
-      emotion = mapSentimentToEmotion(sentiment, agentStance);
+      console.error('Error detecting emotion with Hume, using neutral as fallback:', emotionError);
+      // Use neutral as fallback if Hume API fails
+      emotion = 'neutral';
     }
     
     return {
@@ -258,12 +188,10 @@ export const generateAgentResponse = async (
     const fallbackOptions = fallbackResponses[agentStance] || fallbackResponses[AgentStance.MODERATE];
     const fallbackMessage = fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
     
-    // Use stance-based emotion mapping for fallback
-    const fallbackEmotion = mapSentimentToEmotion(sentiment, agentStance);
-    
+    // Use neutral emotion for fallback
     return {
       message: fallbackMessage,
-      emotion: fallbackEmotion
+      emotion: 'neutral'
     };
   }
 };

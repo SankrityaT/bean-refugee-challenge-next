@@ -1,6 +1,7 @@
 import { GameProvider } from '@/context/GameContext';
 import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
+import '../styles/scrollbar.css';
 
 export default function RootLayout({
   children,

@@ -17,16 +17,16 @@ const TeacherTrainingCard: React.FC<TeacherTrainingCardProps> = ({
   disadvantage
 }) => {
   return (
-    <div className="w-full h-full bg-white rounded-xl border-2 border-gray-300 shadow-md overflow-hidden flex flex-col">
+    <div className="w-72 h-[30rem] bg-white rounded-xl border-2 border-gray-300 shadow-md overflow-hidden flex flex-col">
       {/* Top Header (Pink) */}
       <div className="bg-[#EF5EFF] px-4 py-3">
-        <h2 className="text-white font-bold text-lg">{title}</h2>
+        <h2 className="text-white font-bold text-lg truncate">{title}</h2>
       </div>
 
       {/* Body Content */}
       <div className="p-4 flex flex-col gap-2 flex-grow">
         <div className="flex items-start gap-3">
-          <div className="flex flex-col items-start">
+          <div className="flex flex-col items-start flex-shrink-0">
             <div className="text-[#EF5EFF] font-bold text-sm">Option</div>
             <div className="text-[#EF5EFF] text-6xl font-bold leading-none">{optionNumber}</div>
           </div>
@@ -36,14 +36,14 @@ const TeacherTrainingCard: React.FC<TeacherTrainingCardProps> = ({
         </div>
 
         <div className="flex items-start gap-2 mt-4">
-          <BiLike className="w-10 h-10 text-gray-600" />
+          <BiLike className="w-10 h-10 text-gray-600 flex-shrink-0" />
           <p className="text-sm text-gray-800">
             {advantage}
           </p>
         </div>
 
         <div className="flex items-start gap-2 mt-3">
-          <BiDislike className="w-10 h-10 text-gray-600" />
+          <BiDislike className="w-10 h-10 text-gray-600 flex-shrink-0" />
           <p className="text-sm text-gray-800">
             {disadvantage}
           </p>
@@ -51,7 +51,7 @@ const TeacherTrainingCard: React.FC<TeacherTrainingCardProps> = ({
       </div>
 
       {/* Bottom Pink Footer + Teacher Icon */}
-      <div className="relative">
+      <div className="relative mt-auto">
         <div className="bg-[#EF5EFF] h-6 w-full rounded-b-xl"></div>
 
         <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 z-10">

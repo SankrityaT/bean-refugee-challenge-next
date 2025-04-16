@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import MapCanvas from '@/components/ui/MapCanvas';
-import PolicyCard from '@/components/ui/PolicyCard';
 import BudgetIndicator from '@/components/ui/BudgetIndicator';
 import { POLICY_AREAS } from '@/data/game-data';
 import { calculateRemainingUnits, validateSelections } from '@/lib/budget-engine';
 import { useGameContext } from '@/context/GameContext';
+import StackedPolicyCards from '@/components/ui/StackedPolicyCards';
 
 export default function PolicySelectionPage() {
   const router = useRouter();
@@ -128,20 +128,15 @@ export default function PolicySelectionPage() {
               </h3>
               <p className="text-sm text-gray-600">{area.description}</p>
               
-              <div className="space-y-3">
-                {area.policies.map((policy) => (
-                  <PolicyCard
-                    key={policy.id}
-                    title={policy.title}
-                    description={policy.description}
-                    impact={policy.impact}
-                    tier={policy.tier}
-                    icon={area.icon}
-                    category={area.id}
-                    isSelected={selectedPolicies.includes(policy.id)}
-                    onClick={() => handlePolicySelect(policy.id, policy.tier)}
-                  />
-                ))}
+              {/* Stacked Policy Cards */}
+              <div className="h-[30rem] relative">
+                <StackedPolicyCards
+                  areaId={area.id}
+                  areaIcon={area.icon}
+                  policies={area.policies}
+                  selectedPolicies={selectedPolicies}
+                  onSelectPolicy={handlePolicySelect}
+                />
               </div>
             </div>
           ))}

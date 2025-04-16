@@ -9,8 +9,8 @@ import { startSpeechRecognition, stopSpeechRecognition, isSpeechRecognitionSuppo
 import { speakWithEmotion } from '@/lib/voice-engine/hume-integration';
 import { detectEmotionsWithHume } from '@/lib/emotion-engine/hume-emotion-detection';
 import VoiceVisualizer from './VoiceVisualizer';
-import EmotionMeter from './EmotionMeter';
-import EmotionAvatar from './EmotionAvatar';
+import EmotionMeter from '../EmotionMeter';
+import EmotionAvatar from '../EmotionAvatar';
 import { useToast } from '@/components/ui/use-toast';
 
 interface Message {
@@ -278,13 +278,19 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
       setCurrentEmotion(emotion);
       
       // Add agent message
+      // In the message rendering section, check if the emotion is being passed to the EmotionAvatar component
+      
+      // The issue might be in how messages are displayed in the UI
+      // Make sure each agent message includes the emotion property and it's being passed to the EmotionAvatar
+      
+      // Check the part where agent messages are added to the state
       const agentMessage: Message = {
         id: `${agentName.toLowerCase().replace(' ', '-')}-${Date.now()}`,
         sender: agentName,
         content: message,
         timestamp: new Date(),
-        emotion,
-        respondingTo: lastUserMessageId // Track which message this is responding to
+        emotion, // Make sure this is being set correctly
+        respondingTo: lastUserMessageId
       };
       
       setMessages(prev => [...prev, agentMessage]);

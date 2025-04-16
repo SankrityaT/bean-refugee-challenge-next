@@ -80,7 +80,8 @@ export const mapSentimentToEmotion = (sentiment: SentimentType, stance: AgentSta
 export const detectEmotionWithHumeServer = async (text: string): Promise<EmotionType> => {
   try {
     // Call our Python server's emotion detection endpoint
-    const humeResponse = await fetch('http://localhost:5001/api/emotion', {
+    // Use IPv4 address explicitly to avoid IPv6 connection issues
+    const humeResponse = await fetch('http://127.0.0.1:5001/api/emotion', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

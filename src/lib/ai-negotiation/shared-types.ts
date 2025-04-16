@@ -10,7 +10,7 @@ export interface PolicyWithArea {
   area: string;
 }
 
-export type EmotionType = 'neutral' | 'anger' | 'compassion' | 'frustration' | 'enthusiasm' | 'concern';
+export type EmotionType = string;
 export type SentimentType = 'positive' | 'neutral' | 'negative';
 
 export interface GroqRequestParams {

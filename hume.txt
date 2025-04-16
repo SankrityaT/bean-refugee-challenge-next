@@ -1,0 +1,465 @@
+# EVI Python Quickstart
+
+> A quickstart guide for implementing the Empathic Voice Interface (EVI) with Python.
+
+This guide provides detailed instructions for integrating EVI into your Python projects using Hume's [Python SDK](https://github.com/HumeAI/hume-python-sdk). It is divided into seven key components:
+
+1. **Environment setup**: Download package and system dependencies to run EVI.
+2. **Dependency imports**: Import all necessary dependencies into your script.
+3. **Defining a WebSocketHandler class**: Create a class to manage the WebSocket connection.
+4. **Authentication**: Use your API credentials to authenticate your EVI application.
+5. **Connecting to EVI**: Set up a secure WebSocket connection to interact with EVI.
+6. **Handling audio**: Capture audio data from an input device, and play audio produced by EVI.
+7. **Asynchronous event loop**: Initiate and manage an asynchronous event loop that handles simultaneous, real-time execution of message processing and audio playback.
+
+<Callout intent="info">
+  To see a full implementation within a terminal application, visit our API examples repository on GitHub:
+  [evi-python-quickstart](https://github.com/HumeAI/hume-api-examples/tree/main/evi/evi-python-quickstart)
+</Callout>
+
+<Callout intent="warning">
+  Hume's Python SDK supports EVI using Python versions `3.9`, `3.10`, and `3.11` on macOS and Linux platforms. The full specification be found on the [Python SDK GitHub page](https://github.com/HumeAI/hume-python-sdk).
+</Callout>
+
+<Steps>
+  ### Environment setup
+
+  Before starting the project, it is essential to set up the development environment.
+
+  #### Creating a virtual environment (optional)
+
+  Setting up a virtual environment is a best practice to isolate your project's dependencies from your global Python installation, avoiding potential conflicts.
+
+  You can create a virtual environment using either Python's built-in `venv` module or the `conda` environment manager. See instructions for both below:
+
+  <Tabs>
+    <Tab title="venv">
+      1. **Create** the virtual environment.
+
+      Note that when you create a virtual environment using Python's built-in `venv` tool, the virtual environment will use the same Python version as the global Python installation that you used to create it.
+
+      <CodeBlock title="Creating the virtual environment with venv">
+        ```bash
+        python -m venv evi-env
+        ```
+      </CodeBlock>
+
+      2. **Activate** the virtual environment using the appropriate command for your system platform.
+
+      <CodeBlock title="Activating the virtual environment with venv">
+        ```bash
+        source evi-env/bin/activate
+        ```
+      </CodeBlock>
+
+      <Callout intent="info">
+        The code above demonstrates virtual environment activation on a POSIX platform with a bash/zsh shell. Visit the [venv documentation](https://docs.python.org/3/library/venv.html) to learn more about using `venv` on your platform.
+      </Callout>
+    </Tab>
+
+    <Tab title="conda">
+      1. **Install** `conda` from [Miniconda](https://docs.anaconda.com/miniconda/miniconda-install/) or [Anaconda Distribution](https://docs.anaconda.com/anaconda/install/).
+
+      2. **Create** the virtual environment.
+
+      `conda` allows developers to set the version of their Python interpreter when creating a virtual environment. In the example below, Python version 3.11 is specified:
+
+      <CodeBlock title="Creating the virtual environment with conda">
+        ```bash
+        conda create --name evi-env python=3.11
+        ```
+      </CodeBlock>
+
+      2. **Activate** the virtual environment using the appropriate command for your system platform.
+
+      <CodeBlock title="Activating the virtual environment with conda">
+        ```bash
+        conda activate evi-env
+        ```
+      </CodeBlock>
+
+      <Callout intent="info">
+        Visit the [conda documentation](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#) to learn more about managing Python environments with `conda`.
+      </Callout>
+    </Tab>
+  </Tabs>
+
+  #### Package dependenices
+
+  There are two package dependencies for using EVI:
+
+  1. Hume Python SDK (**required**)
+
+  The `hume[microphone]` package contains the Hume Python SDK. This guide employs EVI's WebSocket and message handling infrastructure as well as various asynchronous programming and audio utilities.
+
+  <CodeBlock title="Installing the Hume Python SDK package">
+    ```bash
+    pip install "hume[microphone]"
+    ```
+  </CodeBlock>
+
+  2. Environment variables (**recommended**)
+
+  The `python-dotenv` package contains the logic for using environment variables to store and load sensitive variables such as API credentials from a `.env` file.
+
+  <CodeBlock title="Installing the environment variable package">
+    ```bash
+    pip install python-dotenv
+    ```
+  </CodeBlock>
+
+  In sample code snippets below, the API key, Secret key, and an EVI configuration ID have been saved to environment variables.
+
+  <Callout intent="info">
+    While not strictly required, using environment variables is considered best practice because it keeps sensitive information like API keys and configuration settings separate from your codebase. This not only enhances security but also makes your application more flexible and easier to manage across different environments.
+  </Callout>
+
+  #### System dependencies
+
+  For audio playback and processing, additional system-level dependencies are required. Below are download instructions for each supported operating system:
+
+  <Tabs>
+    <Tab title="macOS">
+      To ensure audio playback functionality, macOS users will need to install `ffmpeg`, a powerful multimedia framework that handles audio and video processing.
+
+      A common way to install `ffmpeg` on macOS is by using a package manager such as [Homebrew](https://brew.sh). To do so, follow these steps:
+
+      1. Install Homebrew onto your system according to the instructions on the [Homebrew website](https://brew.sh/).
+
+      2. Once Homebrew is installed, you can install `ffmpeg` with `brew`:
+
+      <CodeBlock title="Installing ffmpeg with Homebrew">
+        ```bash
+        brew install ffmpeg
+        ```
+      </CodeBlock>
+
+      <Callout intent="info">
+        If you prefer not to use Homebrew, you can download a pre-built `ffmpeg` binary from the [ffmpeg website](https://ffmpeg.org/download.html) or use other package managers like [MacPorts](https://www.macports.org/).
+      </Callout>
+    </Tab>
+
+    <Tab title="Linux">
+      Linux users will need to install the following packages to support audio input/output and playback:
+
+      * `libasound2-dev`: This package contains development files for the ALSA (Advanced Linux Sound Architecture) sound system.
+      * `libportaudio2`: PortAudio is a cross-platform audio I/O library that is essential for handling audio streams.
+      * `ffmpeg`: Required for processing audio and video files.
+
+      To install these dependencies, use the following commands:
+
+      <CodeBlock title="Installing Linux system dependencies">
+        ```bash
+        sudo apt-get --yes update
+        sudo apt-get --yes install libasound2-dev libportaudio2 ffmpeg
+        ```
+      </CodeBlock>
+    </Tab>
+  </Tabs>
+
+  ### Dependency imports
+
+  The following import statements are used in the example project to handle asynchronous operations, environment variables, audio processing, and communication with the Hume API:
+
+  <Tabs>
+    <Tab title="Import statements">
+      <CodeBlock title="Imports">
+        ```py
+        import asyncio
+        import base64
+        import datetime
+        import os
+        from dotenv import load_dotenv
+        from hume.client import AsyncHumeClient
+        from hume.empathic_voice.chat.socket_client import ChatConnectOptions, ChatWebsocketConnection
+        from hume.empathic_voice.chat.types import SubscribeEvent
+        from hume.empathic_voice.types import UserInput
+        from hume.core.api_error import ApiError
+        from hume import MicrophoneInterface, Stream
+        ```
+      </CodeBlock>
+    </Tab>
+
+    <Tab title="Statement explanations">
+      | Module/Class/Method                                  | Description                                                                                                                  |
+      | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+      | `asyncio`                                            | Provides support for asynchronous programming, allowing the code to handle multiple tasks concurrently.                      |
+      | `base64`                                             | Used to encode and decode audio data in base64 format, essential for processing audio streams.                               |
+      | `os`                                                 | Allows interaction with the operating system, particularly for accessing environment variables.                              |
+      | `datetime`                                           | Used to generate timestamps for logging events.                                                                              |
+      | `load_dotenv`                                        | Loads environment variables from a `.env` file, which are used for API key management and EVI configuration.                 |
+      | `AsyncHumeClient`                                    | Provides an asynchronous client for connecting to the Hume API, which powers the empathic voice interface.                   |
+      | `ChatConnectOptions`, `ChatWebsocketConnection`      | These classes manage WebSocket connections and configuration options for the Hume Empathic Voice Interface (EVI).            |
+      | `SubscribeEvent`                                     | Represents different types of messages received through the WebSocket connection.                                            |
+      | `UserInput`, `AudioConfiguration`, `SessionSettings` | These types define the structure of messages and settings sent to the Hume API, such as user input and audio configurations. |
+      | `Stream`                                             | Manages streams of asynchronous data, particularly useful for handling audio streams.                                        |
+      | `MicrophoneInterface`                                | Manages audio capture and playback from a specified input and output device.                                                 |
+      | `ApiError`                                           | Defines custom error handling for API-related issues, ensuring graceful error management within the application.             |
+    </Tab>
+  </Tabs>
+
+  ### Defining a WebSocketHandler class
+
+  Next, we define a `WebSocketHandler` class to encapsulate WebSocket functionality in one organized component. The handler allows us to implement application-specific behavior upon the socket opening, closing, receiving messages, and handling errors. It also manages the continuous audio stream from a microphone.
+
+  By using a class, you can maintain the WebSocket connection and audio stream state in one place, making it simpler to manage both real-time communication and audio processing.
+
+  Below are the key methods:
+
+  | Method                                        | Description                                                                                                                                                           |
+  | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `__init__()`                                  | Initializes the handler, setting up placeholders for the WebSocket connection.                                                                                        |
+  | `set_socket(socket: ChatWebsocketConnection)` | Associates the WebSocket connection with the handler.                                                                                                                 |
+  | `on_open()`                                   | Called when the WebSocket connection is established, enabling any necessary initialization.                                                                           |
+  | `on_message(data: SubscribeEvent)`            | Handles incoming messages from the WebSocket, processing [different types of messages](https://dev.hume.ai/reference/empathic-voice-interface-evi/chat/chat#receive). |
+  | `on_close()`                                  | Invoked when the WebSocket connection is closed, allowing for cleanup operations.                                                                                     |
+  | `on_error(error: Exception)`                  | Manages errors that occur during WebSocket communication, providing basic error logging.                                                                              |
+
+  <Accordion title="Example WebSocketHandler Structure">
+    Below is an example of what the `WebSocketHandler` class may look like.
+
+    Refer to the [evi-python-quickstart](https://github.com/HumeAI/hume-api-examples/blob/main/evi/evi-python-quickstart/quickstart.py) for a complete example implementation.
+
+    <CodeBlock>
+      ```python
+      import asyncio
+      import base64
+      from hume.empathic_voice.chat.socket_client import ChatWebsocketConnection
+      from hume.empathic_voice.chat.types import SubscribeEvent
+      from hume.core.api_error import ApiError
+      from hume import Stream
+
+      class WebSocketHandler:
+        """Interface for containing the EVI WebSocket and associated socket handling behavior."""
+
+        def __init__(self):
+          """Construct the WebSocketHandler, initially assigning the socket to None and the byte stream to a new Stream object."""
+          self.socket = None
+          self.byte_strs = Stream.new()
+
+        def set_socket(self, socket: ChatWebsocketConnection):
+          """Set the socket."""
+          self.socket = socket
+
+        async def on_open(self):
+          """Logic invoked when the WebSocket connection is opened."""
+          print("WebSocket connection opened.")
+
+        async def on_message(self, message: SubscribeEvent):
+          """Callback function to handle a WebSocket message event.
+          
+          This asynchronous method decodes the message, determines its type, and 
+          handles it accordingly. Depending on the type of message, it 
+          might log metadata, handle user or assistant messages, process
+          audio data, raise an error if the message type is "error", and more.
+
+          See the full list of "Receive" messages in the API Reference.
+          """
+
+          if message.type == "chat_metadata":
+            chat_id = message.chat_id
+            chat_group_id = message.chat_group_id
+            # ...
+          elif message.type in ["user_message", "assistant_message"]:
+            role = message.message.role.upper()
+            message_text = message.message.content
+            # ...
+          elif message.type == "audio_output":
+            message_str: str = message.data
+            message_bytes = base64.b64decode(message_str.encode("utf-8"))
+            await self.byte_strs.put(message_bytes)
+            return
+          elif message.type == "error":
+            error_message = message.message
+            error_code = message.code
+            raise ApiError(f"Error ({error_code}): {error_message}")
+          
+          # Print timestamp and message
+          # ...
+            
+        async def on_close(self):
+          """Logic invoked when the WebSocket connection is closed."""
+          print("WebSocket connection closed.")
+
+        async def on_error(self, error):
+          """Logic invoked when an error occurs in the WebSocket connection."""
+          print(f"Error: {error}")
+      ```
+    </CodeBlock>
+  </Accordion>
+
+  ### Authentication
+
+  In order to establish an authenticated connection, we instantiate the Hume client with our API key and include our Secret key in the query parameters passed into the WebSocket connection.
+
+  <Callout intent="note">
+    You can obtain your API credentials by logging into the Hume Platform and visiting the [API keys page](https://platform.hume.ai/settings/keys).
+  </Callout>
+
+  <CodeBlock title="Authenticating EVI">
+    ```py
+    async def main() -> None:
+      # Retrieve any environment variables stored in the .env file
+      load_dotenv()
+
+      # Retrieve the API key, Secret key, and EVI config id from the environment variables
+      HUME_API_KEY = os.getenv("HUME_API_KEY")
+      HUME_SECRET_KEY = os.getenv("HUME_SECRET_KEY")
+      HUME_CONFIG_ID = os.getenv("HUME_CONFIG_ID")
+
+      # Initialize the asynchronous client, authenticating with your API key
+      client = AsyncHumeClient(api_key=HUME_API_KEY)
+
+      # Define options for the WebSocket connection, such as an EVI config id and a secret key for token authentication
+      options = ChatConnectOptions(config_id=HUME_CONFIG_ID, secret_key=HUME_SECRET_KEY)
+      
+      # ...
+    ```
+  </CodeBlock>
+
+  ### Connecting to EVI
+
+  With the Hume client instantiated with our credentials, we can now establish an authenticated WebSocket connection with EVI and pass in our handlers.
+
+  <CodeBlock title="Connecting to EVI">
+    ```py {6-16}
+    async def main() -> None:
+      # ...
+      # Define options for the WebSocket connection, such as an EVI config id and a secret key for token authentication
+      options = ChatConnectOptions(config_id=HUME_CONFIG_ID, secret_key=HUME_SECRET_KEY)
+
+      # Instantiate the WebSocketHandler
+      websocket_handler = WebSocketHandler()
+
+      # Open the WebSocket connection with the configuration options and the handler's functions
+        async with client.empathic_voice.chat.connect_with_callbacks(
+          options=options,
+          on_open=websocket_handler.on_open,
+          on_message=websocket_handler.on_message,
+          on_close=websocket_handler.on_close,
+          on_error=websocket_handler.on_error
+        ) as socket:
+        
+          # Set the socket instance in the handler
+          websocket_handler.set_socket(socket)
+          # ...
+    ```
+  </CodeBlock>
+
+  ### Handling audio
+
+  The `MicrophoneInterface` class captures audio input from the user's device and streams it over the WebSocket connection.
+
+  Audio playback occurs when the `WebSocketHandler` receives audio data over the WebSocket connection in its asynchronous byte stream from an `audio_output` message.
+
+  In this example, `byte_strs` is a stream of audio data that the WebSocket connection populates.
+
+  <CodeBlock title="Capturing and sending audio to EVI">
+    ```py {7-11}
+    async def main() -> None:
+      # Open the WebSocket connection with the configuration options and the handler's functions
+      async with client.empathic_voice.chat.connect_with_callbacks(...) as socket:
+        # Set the socket instance in the handler
+        websocket_handler.set_socket(socket)
+
+        # Create an asynchronous task to continuously detect and process input from the microphone, as well as play audio
+        microphone_task = asyncio.create_task(
+          MicrophoneInterface.start(
+            socket,
+            byte_stream=websocket_handler.byte_strs
+          )
+        )
+        
+        # Await the microphone task
+        await microphone_task
+
+    ```
+  </CodeBlock>
+
+  #### Specifying a microphone device
+
+  You can specify your microphone device using the `device` parameter in the `MicrophoneInterface` object's `start` method.
+
+  To view a list of available audio devices, run the following command:
+
+  <CodeBlock title="List available audio devices">
+    `python -c "import sounddevice; print(sounddevice.query_devices())"`
+  </CodeBlock>
+
+  Below is an example output:
+
+  <CodeBlock title="Example audio device list">
+    ```bash
+       0 DELL U2720QM, Core Audio (0 in, 2 out)
+       1 I, Phone 15 Pro Max Microphone, Core Audio (1 in, 0 out)
+    >  2 Studio Display Microphone, Core Audio (1 in, 0 out)
+       3 Studio Display Speakers, Core Audio (0 in, 8 out)
+       4 MacBook Pro Microphone, Core Audio (1 in, 0 out)
+    <  5 MacBook Pro Speakers, Core Audio (0 in, 2 out)
+       6 Pro Tools Audio Bridge 16, Core Audio (16 in, 16 out)
+       7 Pro Tools Audio Bridge 2-A, Core Audio (2 in, 2 out)
+       8 Pro Tools Audio Bridge 2-B, Core Audio (2 in, 2 out)
+       9 Pro Tools Audio Bridge 32, Core Audio (32 in, 32 out)
+      10 Pro Tools Audio Bridge 64, Core Audio (64 in, 64 out)
+      11 Pro Tools Audio Bridge 6, Core Audio (6 in, 6 out)
+      12 Apowersoft Audio Device, Core Audio (2 in, 2 out)
+      13 ZoomAudioDevice, Core Audio (2 in, 2 out)
+    ```
+  </CodeBlock>
+
+  If the `MacBook Pro Microphone` is the desired device, specify device 4 in the Microphone context. For example:
+
+  <CodeBlock title="Python">
+    ```python
+    # Specify device 4 in MicrophoneInterface
+    MicrophoneInterface.start(
+      socket,
+      device=4,
+      allow_user_interrupt=True,
+      byte_stream=websocket_handler.byte_strs
+    )
+    ```
+  </CodeBlock>
+
+  For troubleshooting faulty device detection - particularly with systems using ALSA, the Advanced Linux Sound Architecture, the device may also be directly specified using the `sounddevice` library:
+
+  <CodeBlock title="Setting default sounddevice library device">
+    ```python
+    # Directly import the sounddevice library
+    import sounddevice as sd
+
+    # Set the default device prior to scheduling audio input task
+    sd.default.device = 4
+    ```
+  </CodeBlock>
+
+  #### Allowing interruption
+
+  The `allow_interrupt` parameter in the `MicrophoneInterface` class allows control over whether the user can send a message while the assistant is speaking:
+
+  <CodeBlock title="Allowing an interrupt">
+    ```python
+    # Specify allowing interruption
+    MicrophoneInterface.start(
+      socket,
+      allow_user_interrupt=True,
+      byte_stream=websocket_handler.byte_strs
+    )
+    ```
+  </CodeBlock>
+
+  * `allow_interrupt=True`: Allows the user to send microphone input even when the assistant is speaking. This enables more fluid, overlapping conversation.
+  * `allow_interrupt=False`: Prevents the user from sending microphone input while the assistant is speaking, ensuring that the user does not interrupt the assistant. This is useful in scenarios where clear, uninterrupted communication is important.
+
+  ### Asynchronous event loop
+
+  Initialize, execute, and manage the lifecycle of the asynchronous event loop, making sure that the `main()` coroutine and its runs effectively and that the application shuts down cleanly after the coroutine finishes executing.
+
+  <CodeBlock title="Initialize the async event loop in global scope">
+    ```py
+    asyncio.run(main())
+    ```
+  </CodeBlock>
+</Steps>
+
+***

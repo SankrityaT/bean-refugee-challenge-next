@@ -1,89 +1,95 @@
-import { EmotionType } from '../ai-negotiation/shared-types';
+import { EmotionType } from '@/lib/ai-negotiation/shared-types';
 
 /**
- * Detect emotions from text using our Python server's emotion detection API
+ * Detects emotions in text using Hume AI's Language API via our Python server
  * @param text Text to analyze for emotions
- * @returns Detected emotion type and raw emotion data
+ * @returns Detected emotion type
  */
-export async function detectEmotionsWithHume(text: string): Promise<{
-  dominantEmotion: EmotionType;
-  emotions: Array<{ name: string; score: number }>;
-}> {
+export const detectEmotionsWithHume = async (text: string): Promise<string> => {
   try {
     // Call our Python server's emotion detection endpoint
-    const response = await fetch('http://localhost:5001/api/emotion', {
+    const humeResponse = await fetch('http://localhost:5001/api/emotion', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({
+        text
+      })
     });
-
-    if (!response.ok) {
-      console.error(`Error detecting emotions: ${response.statusText}`);
-      // Return neutral as fallback
-      return {
-        dominantEmotion: 'neutral',
-        emotions: []
-      };
-    }
-
-    const data = await response.json();
     
-    // If no emotions data, fall back to stance-based emotion
-    if (!data.dominantEmotion) {
-      return {
-        dominantEmotion: 'neutral',
-        emotions: []
-      };
+    if (!humeResponse.ok) {
+      console.error('Hume API error details:', await humeResponse.text());
+      return 'Neutral';
     }
     
-    return {
-      dominantEmotion: data.dominantEmotion as EmotionType,
-      emotions: data.emotions || []
-    };
+    const humeData = await humeResponse.json();
+    
+    // Log the full emotion data for debugging
+    console.log('Hume server-side emotion data:', humeData);
+    
+    // Return the raw emotion from Hume
+    return humeData.dominantEmotion;
   } catch (error) {
     console.error('Error detecting emotions with Hume:', error);
-    // Return neutral as fallback
-    return {
-      dominantEmotion: 'neutral',
-      emotions: []
-    };
+    return 'Neutral';
   }
-}
+};
 
 /**
  * Get emotion color based on emotion type
  * @param emotion Emotion type
  * @returns CSS color class
  */
-export function getEmotionColor(emotion: EmotionType): string {
-  const emotionColors: Record<EmotionType, string> = {
-    'neutral': 'text-gray-600',
-    'anger': 'text-red-600',
-    'compassion': 'text-pink-600',
-    'frustration': 'text-orange-600',
-    'enthusiasm': 'text-green-600',
-    'concern': 'text-amber-600'
+export const getEmotionColor = (emotion: string): string => {
+  // Basic emotion categories for UI purposes
+  const emotionColors: Record<string, string> = {
+    'Neutral': 'text-gray-600',
+    'Anger': 'text-red-500',
+    'Annoyance': 'text-red-400',
+    'Frustration': 'text-orange-500',
+    'Disappointment': 'text-orange-400',
+    'Enthusiasm': 'text-blue-500',
+    'Joy': 'text-blue-400',
+    'Excitement': 'text-blue-500',
+    'Satisfaction': 'text-blue-400',
+    'Compassion': 'text-pink-500',
+    'Empathy': 'text-pink-400',
+    'Sympathy': 'text-pink-400',
+    'Concern': 'text-yellow-500',
+    'Anxiety': 'text-yellow-400',
+    'Fear': 'text-yellow-600',
   };
   
-  return emotionColors[emotion] || emotionColors.neutral;
-}
+  // Default to neutral if no match
+  return emotionColors[emotion] || 'text-gray-600';
+};
 
 /**
  * Get emotion background color based on emotion type
  * @param emotion Emotion type
  * @returns CSS background color class
  */
-export function getEmotionBgColor(emotion: EmotionType): string {
-  const emotionBgColors: Record<EmotionType, string> = {
-    'neutral': 'bg-gray-100',
-    'anger': 'bg-red-50',
-    'compassion': 'bg-pink-50',
-    'frustration': 'bg-orange-50',
-    'enthusiasm': 'bg-green-50',
-    'concern': 'bg-amber-50'
+export const getEmotionBgColor = (emotion: string): string => {
+  // Basic emotion categories for UI purposes
+  const emotionBgColors: Record<string, string> = {
+    'Neutral': 'bg-gray-100',
+    'Anger': 'bg-red-100',
+    'Annoyance': 'bg-red-50',
+    'Frustration': 'bg-orange-100',
+    'Disappointment': 'bg-orange-50',
+    'Enthusiasm': 'bg-blue-100',
+    'Joy': 'bg-blue-50',
+    'Excitement': 'bg-blue-100',
+    'Satisfaction': 'bg-blue-50',
+    'Compassion': 'bg-pink-100',
+    'Empathy': 'bg-pink-50',
+    'Sympathy': 'bg-pink-50',
+    'Concern': 'bg-yellow-100',
+    'Anxiety': 'bg-yellow-50',
+    'Fear': 'bg-yellow-100',
   };
   
-  return emotionBgColors[emotion] || emotionBgColors.neutral;
-}
+  // Default to neutral if no match
+  return emotionBgColors[emotion] || 'bg-gray-100';
+};

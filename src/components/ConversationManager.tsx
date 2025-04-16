@@ -9,6 +9,8 @@ import { startSpeechRecognition, stopSpeechRecognition, isSpeechRecognitionSuppo
 import { speakWithEmotion } from '@/lib/voice-engine/hume-integration';
 import { detectEmotionsWithHume } from '@/lib/emotion-engine/hume-emotion-detection';
 import VoiceVisualizer from './VoiceVisualizer';
+import EmotionMeter from './EmotionMeter';
+import EmotionAvatar from './EmotionAvatar';
 import { useToast } from '@/components/ui/use-toast';
 
 interface Message {
@@ -153,8 +155,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
     
     try {
       // Detect emotion from user input using Hume AI
-      const emotionResult = await detectEmotionsWithHume(userInput);
-      const detectedEmotion = emotionResult.dominantEmotion;
+      const detectedEmotion = await detectEmotionsWithHume(userInput);
       setUserEmotion(detectedEmotion);
       
       // Add user message
@@ -443,44 +444,6 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
     }
   };
   
-  // Get emotion icon and color based on emotion type
-  const getEmotionDisplay = (emotion: string = 'neutral') => {
-    const emotionMap: Record<string, { icon: React.ReactNode; color: string; bgColor: string }> = {
-      'neutral': { 
-        icon: <Meh className="h-3 w-3 mr-1" />, 
-        color: 'text-gray-600',
-        bgColor: 'bg-gray-100'
-      },
-      'anger': { 
-        icon: <AlertTriangle className="h-3 w-3 mr-1" />, 
-        color: 'text-red-600',
-        bgColor: 'bg-red-50'
-      },
-      'compassion': { 
-        icon: <Heart className="h-3 w-3 mr-1" />, 
-        color: 'text-pink-600',
-        bgColor: 'bg-pink-50'
-      },
-      'frustration': { 
-        icon: <Frown className="h-3 w-3 mr-1" />, 
-        color: 'text-orange-600',
-        bgColor: 'bg-orange-50'
-      },
-      'enthusiasm': { 
-        icon: <Smile className="h-3 w-3 mr-1" />, 
-        color: 'text-green-600',
-        bgColor: 'bg-green-50'
-      },
-      'concern': { 
-        icon: <AlertTriangle className="h-3 w-3 mr-1" />, 
-        color: 'text-amber-600',
-        bgColor: 'bg-amber-50'
-      }
-    };
-
-    return emotionMap[emotion] || emotionMap['neutral'];
-  };
-
   return (
     <div className="flex flex-col h-full bg-white rounded-lg shadow-sm overflow-hidden">
       {/* Live Debate Section */}
@@ -502,9 +465,13 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
             }`}
           >
             <div className="flex items-center mb-2">
-              <div className="flex-shrink-0 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-2">
-                M
-              </div>
+              <EmotionAvatar
+                agentName="Minister Santos"
+                emotion={messages.filter(msg => msg.sender === 'Minister Santos').slice(-1)[0]?.emotion as EmotionType || 'neutral'}
+                isActive={activeAgent === 'Minister Santos'}
+                size="md"
+                className="mr-2"
+              />
               <div>
                 <div className="font-medium text-sm">Minister Santos</div>
                 <div className="text-xs text-gray-500">Education Minister</div>
@@ -516,21 +483,13 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
                     <span className="text-xs text-green-600">Speaking</span>
                   </div>
                 )}
-                {messages.filter(msg => msg.sender === 'Minister Santos').length > 0 && (() => {
-                  const emotion = messages
-                    .filter(msg => msg.sender === 'Minister Santos')
-                    .slice(-1)[0]?.emotion || 'neutral';
-                  const { icon, color, bgColor } = getEmotionDisplay(emotion);
-                  
-                  return (
-                    <div className="flex items-center">
-                      <span className={`text-[10px] px-1.5 py-0.5 ${bgColor} ${color} rounded-full capitalize flex items-center whitespace-nowrap overflow-hidden`}>
-                        {icon}
-                        {emotion}
-                      </span>
-                    </div>
-                  );
-                })()}
+                {messages.filter(msg => msg.sender === 'Minister Santos').length > 0 && (
+                  <EmotionMeter 
+                    emotion={messages.filter(msg => msg.sender === 'Minister Santos').slice(-1)[0]?.emotion as EmotionType || 'neutral'}
+                    size="sm"
+                    showIntensity={true}
+                  />
+                )}
               </div>
             </div>
             
@@ -562,9 +521,13 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
             }`}
           >
             <div className="flex items-center mb-2">
-              <div className="flex-shrink-0 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-2">
-                D
-              </div>
+              <EmotionAvatar
+                agentName="Dr. Chen"
+                emotion={messages.filter(msg => msg.sender === 'Dr. Chen').slice(-1)[0]?.emotion as EmotionType || 'neutral'}
+                isActive={activeAgent === 'Dr. Chen'}
+                size="md"
+                className="mr-2"
+              />
               <div>
                 <div className="font-medium text-sm">Dr. Chen</div>
                 <div className="text-xs text-gray-500">Education Researcher</div>
@@ -576,21 +539,13 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
                     <span className="text-xs text-green-600">Speaking</span>
                   </div>
                 )}
-                {messages.filter(msg => msg.sender === 'Dr. Chen').length > 0 && (() => {
-                  const emotion = messages
-                    .filter(msg => msg.sender === 'Dr. Chen')
-                    .slice(-1)[0]?.emotion || 'neutral';
-                  const { icon, color, bgColor } = getEmotionDisplay(emotion);
-                  
-                  return (
-                    <div className="flex items-center">
-                      <span className={`text-[10px] px-1.5 py-0.5 ${bgColor} ${color} rounded-full capitalize flex items-center whitespace-nowrap overflow-hidden`}>
-                        {icon}
-                        {emotion}
-                      </span>
-                    </div>
-                  );
-                })()}
+                {messages.filter(msg => msg.sender === 'Dr. Chen').length > 0 && (
+                  <EmotionMeter 
+                    emotion={messages.filter(msg => msg.sender === 'Dr. Chen').slice(-1)[0]?.emotion as EmotionType || 'neutral'}
+                    size="sm"
+                    showIntensity={true}
+                  />
+                )}
               </div>
             </div>
             
@@ -622,9 +577,13 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
             }`}
           >
             <div className="flex items-center mb-2">
-              <div className="flex-shrink-0 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-2">
-                M
-              </div>
+              <EmotionAvatar
+                agentName="Mayor Okonjo"
+                emotion={messages.filter(msg => msg.sender === 'Mayor Okonjo').slice(-1)[0]?.emotion as EmotionType || 'neutral'}
+                isActive={activeAgent === 'Mayor Okonjo'}
+                size="md"
+                className="mr-2"
+              />
               <div>
                 <div className="font-medium text-sm">Mayor Okonjo</div>
                 <div className="text-xs text-gray-500">City Mayor</div>
@@ -636,21 +595,13 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
                     <span className="text-xs text-green-600">Speaking</span>
                   </div>
                 )}
-                {messages.filter(msg => msg.sender === 'Mayor Okonjo').length > 0 && (() => {
-                  const emotion = messages
-                    .filter(msg => msg.sender === 'Mayor Okonjo')
-                    .slice(-1)[0]?.emotion || 'neutral';
-                  const { icon, color, bgColor } = getEmotionDisplay(emotion);
-                  
-                  return (
-                    <div className="flex items-center">
-                      <span className={`text-[10px] px-1.5 py-0.5 ${bgColor} ${color} rounded-full capitalize flex items-center whitespace-nowrap overflow-hidden`}>
-                        {icon}
-                        {emotion}
-                      </span>
-                    </div>
-                  );
-                })()}
+                {messages.filter(msg => msg.sender === 'Mayor Okonjo').length > 0 && (
+                  <EmotionMeter 
+                    emotion={messages.filter(msg => msg.sender === 'Mayor Okonjo').slice(-1)[0]?.emotion as EmotionType || 'neutral'}
+                    size="sm"
+                    showIntensity={true}
+                  />
+                )}
               </div>
             </div>
             
@@ -682,9 +633,13 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
             }`}
           >
             <div className="flex items-center mb-2">
-              <div className="flex-shrink-0 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-2">
-                C
-              </div>
+              <EmotionAvatar
+                agentName="Community Leader Patel"
+                emotion={messages.filter(msg => msg.sender === 'Community Leader Patel').slice(-1)[0]?.emotion as EmotionType || 'neutral'}
+                isActive={activeAgent === 'Community Leader Patel'}
+                size="md"
+                className="mr-2"
+              />
               <div>
                 <div className="font-medium text-sm">Community Leader Patel</div>
                 <div className="text-xs text-gray-500">Community Advocate</div>
@@ -696,21 +651,13 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
                     <span className="text-xs text-green-600">Speaking</span>
                   </div>
                 )}
-                {messages.filter(msg => msg.sender === 'Community Leader Patel').length > 0 && (() => {
-                  const emotion = messages
-                    .filter(msg => msg.sender === 'Community Leader Patel')
-                    .slice(-1)[0]?.emotion || 'neutral';
-                  const { icon, color, bgColor } = getEmotionDisplay(emotion);
-                  
-                  return (
-                    <div className="flex items-center">
-                      <span className={`text-[10px] px-1.5 py-0.5 ${bgColor} ${color} rounded-full capitalize flex items-center whitespace-nowrap overflow-hidden`}>
-                        {icon}
-                        {emotion}
-                      </span>
-                    </div>
-                  );
-                })()}
+                {messages.filter(msg => msg.sender === 'Community Leader Patel').length > 0 && (
+                  <EmotionMeter 
+                    emotion={messages.filter(msg => msg.sender === 'Community Leader Patel').slice(-1)[0]?.emotion as EmotionType || 'neutral'}
+                    size="sm"
+                    showIntensity={true}
+                  />
+                )}
               </div>
             </div>
             
@@ -753,21 +700,13 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
                     <span className="text-xs text-green-600">Listening</span>
                   </div>
                 )}
-                {messages.filter(msg => msg.isUser).length > 0 && (() => {
-                  const emotion = messages
-                    .filter(msg => msg.isUser)
-                    .slice(-1)[0]?.emotion || 'neutral';
-                  const { icon, color, bgColor } = getEmotionDisplay(emotion);
-                  
-                  return (
-                    <div className="flex items-center">
-                      <span className={`text-[10px] px-1.5 py-0.5 ${bgColor} ${color} rounded-full capitalize flex items-center whitespace-nowrap overflow-hidden`}>
-                        {icon}
-                        {emotion}
-                      </span>
-                    </div>
-                  );
-                })()}
+                {messages.filter(msg => msg.isUser).length > 0 && (
+                  <EmotionMeter 
+                    emotion={messages.filter(msg => msg.isUser).slice(-1)[0]?.emotion as EmotionType || 'neutral'}
+                    size="sm"
+                    showIntensity={true}
+                  />
+                )}
               </div>
             </div>
             
@@ -820,23 +759,34 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
                           {message.sender.substring(0, 1)}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="font-medium text-sm">{message.sender}</div>
-                      {message.emotion && message.emotion !== 'neutral' && (
-                        <div className="ml-2 px-1.5 py-0.5 rounded-full text-xs bg-gray-100 text-gray-800">
-                          {message.emotion}
-                        </div>
-                      )}
+                      <div>
+                        <div className="font-medium text-sm">{message.sender}</div>
+                        <div className="text-xs text-gray-500">{message.isUser ? 'Policy Advisor' : 'Stakeholder'}</div>
+                      </div>
+                      <div className="ml-auto flex flex-col items-end gap-1">
+                        {message.emotion && message.emotion !== 'neutral' && (
+                          <EmotionMeter 
+                            emotion={message.emotion as EmotionType}
+                            size="sm"
+                            showIntensity={true}
+                          />
+                        )}
+                      </div>
                     </div>
                   )}
                   
                   {message.isUser && (
                     <div className="flex items-center mb-2 justify-end">
                       <div className="font-medium text-sm">{message.sender}</div>
-                      {message.emotion && message.emotion !== 'neutral' && (
-                        <div className="ml-2 px-1.5 py-0.5 rounded-full text-xs bg-gray-700 text-white">
-                          {message.emotion}
-                        </div>
-                      )}
+                      <div className="ml-auto flex flex-col items-end gap-1">
+                        {message.emotion && message.emotion !== 'neutral' && (
+                          <EmotionMeter 
+                            emotion={message.emotion as EmotionType}
+                            size="sm"
+                            showIntensity={true}
+                          />
+                        )}
+                      </div>
                       <Avatar className="h-6 w-6 ml-2">
                         <AvatarFallback className="bg-white text-policy-maroon font-medium">
                           {message.sender.substring(0, 1)}

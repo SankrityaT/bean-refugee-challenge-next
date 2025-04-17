@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { validateSelections, calculateRemainingUnits } from '@/lib/budget-engine';
 import { generateReflection, saveReflectionResponse } from '@/lib/reflection-engine';
 import { PolicyWithArea } from '@/lib/ai-negotiation/shared-types'; // Fix the import path
@@ -13,11 +13,20 @@ interface GameProviderProps {
   children: React.ReactNode;
 }
 
+// Add NegotiationLog type
+export interface NegotiationLog {
+  agent: string;
+  content: string;
+  timestamp: string;
+  emotion?: string;
+  isUser?: boolean;
+}
+
 // Add to your GameContextType interface
 export interface GameContextType {
   // State
   selectedPolicies: string[];
-  negotiationLogs: any[];
+  negotiationLogs: NegotiationLog[];
   reflectionData: any;
   budgetValidation: {
     isValid: boolean;
@@ -30,8 +39,8 @@ export interface GameContextType {
   setSelectedPolicies: (policies: string[]) => void;
   addSelectedPolicy: (policyId: string) => void;
   removeSelectedPolicy: (policyId: string) => void;
-  setNegotiationLogs: (logs: any[]) => void;
-  addNegotiationLog: (log: any) => void;
+  setNegotiationLogs: (logs: NegotiationLog[]) => void;
+  addNegotiationLog: (log: NegotiationLog) => void;
   saveReflection: (questionId: string, response: string) => void;
   setReflectionData: (data: any) => void;
   
@@ -47,7 +56,7 @@ const GameContext = createContext<GameContextType | undefined>(undefined);
 // Then in your GameProvider component
 export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const [selectedPolicies, setSelectedPolicies] = useState<string[]>([]);
-  const [negotiationLogs, setNegotiationLogs] = useState<any[]>([]);
+  const [negotiationLogs, setNegotiationLogs] = useState<NegotiationLog[]>([]);
   const [reflectionData, setReflectionData] = useState(null);
   const [budgetValidation, setBudgetValidation] = useState({
     isValid: true,
@@ -81,7 +90,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   };
 
   // Add a negotiation log
-  const addNegotiationLog = (log: any) => {
+  const addNegotiationLog = (log: NegotiationLog) => {
     setNegotiationLogs(prev => [...prev, log]);
   };
 
@@ -126,7 +135,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     getSelectedPolicyObjects,
     generateReflectionData,
     saveReflection,
-    setReflectionData, // Added comma here
+    setReflectionData,
     aiFeedback,
     setAiFeedback,
   };

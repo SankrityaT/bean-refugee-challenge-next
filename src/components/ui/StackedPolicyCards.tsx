@@ -1,7 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, TouchEvent } from 'react';
 import PolicyCard from './PolicyCard';
+import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence } from "framer-motion";
+import { Badge } from "@/components/ui/badge";
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface StackedPolicyCardsProps {
   policies: any[];
@@ -20,6 +24,30 @@ const StackedPolicyCards: React.FC<StackedPolicyCardsProps> = ({
 }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [showAll, setShowAll] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerHeight, setContainerHeight] = useState(0);
+  
+  // Touch handling state
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  
+  // Minimum swipe distance (in px)
+  const minSwipeDistance = 50;
+
+  // Update container height on mount and window resize
+  useEffect(() => {
+    const updateHeight = () => {
+      if (containerRef.current) {
+        // Use a percentage of viewport height that works well on mobile
+        const height = Math.min(window.innerHeight * 0.7, 600); 
+        setContainerHeight(height);
+      }
+    };
+
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+    return () => window.removeEventListener('resize', updateHeight);
+  }, []);
 
   // Toggle between stacked view and grid view
   const toggleView = () => {
@@ -31,192 +59,232 @@ const StackedPolicyCards: React.FC<StackedPolicyCardsProps> = ({
     setActiveIndex(index);
   };
 
+  // Handle policy selection
+  const handleSelectPolicy = (policyId: string, policyTier: number) => {
+    onSelectPolicy(policyId, policyTier);
+  };
+  
+  // Navigate to previous card
+  const goToPrevious = () => {
+    setActiveIndex(prev => (prev > 0 ? prev - 1 : policies.length - 1));
+  };
+  
+  // Navigate to next card
+  const goToNext = () => {
+    setActiveIndex(prev => (prev < policies.length - 1 ? prev + 1 : 0));
+  };
+  
+  // Touch event handlers for swipe
+  const onTouchStart = (e: TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+  
+  const onTouchMove = (e: TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+  
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    
+    if (isLeftSwipe) {
+      goToNext();
+    } else if (isRightSwipe) {
+      goToPrevious();
+    }
+  };
+
   return (
-    <div className="relative h-full">
+    <div 
+      className="relative w-full" 
+      ref={containerRef} 
+      style={{ height: containerHeight }}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
       {/* View toggle button */}
       <button 
         onClick={toggleView}
-        className="absolute top-2 right-2 z-50 bg-white text-black px-3 py-1 rounded-full text-sm font-medium shadow-md hover:bg-gray-100 transition-all"
+        className="absolute top-2 right-2 z-50 bg-white/90 text-black px-3 py-1 rounded-full text-sm font-medium shadow-md hover:bg-white transition-all"
       >
         {showAll ? 'Stack Cards' : 'Show All'}
       </button>
 
       {showAll ? (
-        // Grid view - all cards visible with fixed heights
-        <div className="grid grid-cols-1 gap-6 overflow-y-auto pr-1 pb-4" style={{ maxHeight: '100%' }}>
+        // Grid view - all cards visible with scrollable container
+        <div className="grid grid-cols-1 gap-6 overflow-y-auto p-4" 
+             style={{ maxHeight: '100%', paddingBottom: '2rem' }}>
           {policies.map((policy, index) => (
-            <div key={policy.id} className="transform transition-all duration-300 mb-10">
+            <div key={policy.id} className="transform transition-all duration-300">
               <div className="relative">
+                {/* Tier badge - moved to top right */}
+                <div className="absolute top-2 right-2 z-20">
+                  <Badge className="bg-primary text-white font-bold">
+                    {policy.tier} {policy.tier === 1 ? 'Unit' : 'Units'}
+                  </Badge>
+                </div>
+                
                 <PolicyCard
                   id={policy.id}
                   title={policy.title}
                   description={policy.description}
                   impact={policy.impact}
                   tier={policy.tier}
+                  cost={policy.cost}
                   icon={areaIcon}
                   category={areaId}
                   isSelected={selectedPolicies.includes(policy.id)}
-                  onClick={() => {}}
+                  onClick={() => handleCardClick(index)}
                 />
-                {/* Select Policy button styled like the Show All button */}
-                <div 
-                  className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-black px-3 py-1 rounded-full text-sm font-medium shadow-md hover:bg-gray-100 transition-all cursor-pointer"
-                  onClick={() => onSelectPolicy(policy.id, policy.tier)}
-                >
-                  <span>Select Policy</span>
+                <div className="absolute bottom-4 right-4 z-10">
+                  <Button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectPolicy(policy.id, policy.tier);
+                    }}
+                    className="bg-primary hover:bg-primary/90 text-white"
+                  >
+                    {selectedPolicies.includes(policy.id) ? 'Deselect Policy' : 'Select Policy'}
+                  </Button>
                 </div>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        // Apple Wallet style stacked view with improved positioning
-        <div className="relative w-full h-full overflow-hidden bg-transparent">
-          {/* Container with proper height to contain all cards */}
-          <div className="relative w-full h-[35rem] mt-[120px]">
-            {/* Stack cards with Apple Wallet style offsets */}
-            <div className="relative w-full h-full overflow-visible">
-              {/* Option 3 - Top card */}
-              {policies.length > 2 && (
-                <div 
-                  key={policies[2].id} 
-                  className="absolute inset-x-0 transition-all duration-300 ease-in-out shadow-lg cursor-pointer bg-white"
-                  style={{
-                    top: '-120px',  
-                    height: policies[2].id.includes('psychosocial') ? '32rem' : 
-                           policies[2].id.includes('certification') ? '38rem' : '30rem',
-                    zIndex: activeIndex === 2 ? 40 : 10,
-                    borderRadius: '12px',
-                    transform: activeIndex === 2 ? 'scale(1.02)' : 'scale(1)',
+        // Stacked view - cards stacked with active card on top
+        <div className="relative h-full flex items-center justify-center overflow-hidden">
+          {/* Left navigation arrow for desktop */}
+          <button 
+            onClick={goToPrevious}
+            className="absolute left-1 md:left-4 z-40 bg-white/80 rounded-full p-1 md:p-2 shadow-md hidden md:block"
+            aria-label="Previous card"
+          >
+            <ChevronLeft className="h-5 w-5 md:h-6 md:w-6" />
+          </button>
+          
+          {/* Right navigation arrow for desktop */}
+          <button 
+            onClick={goToNext}
+            className="absolute right-1 md:right-4 z-40 bg-white/80 rounded-full p-1 md:p-2 shadow-md hidden md:block"
+            aria-label="Next card"
+          >
+            <ChevronRight className="h-5 w-5 md:h-6 md:w-6" />
+          </button>
+          
+          <AnimatePresence>
+            {policies.map((policy, index) => {
+              // Calculate offset for stacked appearance
+              const isActive = index === activeIndex;
+              const zIndex = policies.length - Math.abs(activeIndex - index);
+              
+              // Adjust rotation and offset for better mobile display
+              // Reduce rotation angle for better readability on small screens
+              const rotation = index < activeIndex 
+                ? -3 + (index - activeIndex) * 1 
+                : 3 + (index - activeIndex) * 1;
+              
+              // Adjust x-offset to ensure cards are fully visible on mobile
+              // Use percentage-based offsets for better responsiveness
+              const xOffset = index < activeIndex 
+                ? `-${15 + (activeIndex - index) * 5}%` 
+                : `${15 + (index - activeIndex) * 5}%`;
+              
+              // Reduce y-offset for mobile
+              const yOffset = Math.abs(index - activeIndex) * 10;
+              
+              return (
+                <motion.div
+                  key={policy.id}
+                  className="absolute cursor-pointer"
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ 
+                    scale: isActive ? 1 : 0.95 - Math.abs(activeIndex - index) * 0.03,
+                    opacity: 1 - Math.abs(activeIndex - index) * 0.15,
+                    rotateZ: rotation,
+                    x: xOffset,
+                    y: yOffset,
+                    zIndex
                   }}
-                  onClick={() => {
-                    handleCardClick(2);
+                  transition={{ duration: 0.3 }}
+                  style={{ 
+                    zIndex,
+                    width: '85%', // Reduced width to ensure cards are fully visible
+                    maxWidth: '380px',
+                    pointerEvents: 'auto' // Ensure all cards are clickable
                   }}
+                  onClick={() => handleCardClick(index)}
                 >
-                  <PolicyCard
-                    id={policies[2].id}
-                    title={policies[2].title}
-                    description={policies[2].description}
-                    impact={policies[2].impact}
-                    tier={policies[2].tier}
-                    icon={areaIcon}
-                    category={areaId}
-                    isSelected={selectedPolicies.includes(policies[2].id)}
-                    onClick={() => handleCardClick(2)}
-                  />
-                  {activeIndex === 2 && (
-                    <div 
-                      className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-black px-3 py-1 rounded-full text-sm font-medium shadow-md hover:bg-gray-100 transition-all z-40 cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectPolicy(policies[2].id, policies[2].tier);
-                      }}
-                    >
-                      <span>Select Policy</span>
+                  <div className="relative">
+                    {/* Tier badge - moved to top right */}
+                    <div className="absolute top-2 right-2 z-20">
+                      <Badge className="bg-primary text-white font-bold">
+                        {policy.tier} {policy.tier === 1 ? 'Unit' : 'Units'}
+                      </Badge>
                     </div>
-                  )}
-                </div>
-              )}
-              
-              {/* Option 2 - Middle card */}
-              {policies.length > 1 && (
-                <div 
-                  key={policies[1].id} 
-                  className="absolute inset-x-0 transition-all duration-300 ease-in-out shadow-lg cursor-pointer bg-white"
-                  style={{
-                    top: '-60px',  
-                    height: policies[1].id.includes('psychosocial') ? '32rem' : 
-                           policies[1].id.includes('certification') ? '46rem' : '30rem',
-                    zIndex: activeIndex === 1 ? 40 : 20,
-                    borderRadius: '12px',
-                    transform: activeIndex === 1 ? 'scale(1.02)' : 'scale(1)',
-                    overflow: policies[1].id.includes('certification') ? 'visible' : 'hidden'
-                  }}
-                  onClick={() => {
-                    handleCardClick(1);
-                  }}
-                >
-                  <PolicyCard
-                    id={policies[1].id}
-                    title={policies[1].title}
-                    description={policies[1].description}
-                    impact={policies[1].impact}
-                    tier={policies[1].tier}
-                    icon={areaIcon}
-                    category={areaId}
-                    isSelected={selectedPolicies.includes(policies[1].id)}
-                    onClick={() => handleCardClick(1)}
-                  />
-                  
-                  {/* Special case for Option 2 certification cards */}
-                  {activeIndex === 1 && (
-                    <>
-                      {policies[1].id.includes('certification') ? (
-                        <button 
-                          className="absolute left-1/2 transform -translate-x-1/2 bg-white text-black px-3 py-1 rounded-full text-sm font-medium shadow-md hover:bg-gray-100 transition-all z-[9999] cursor-pointer"
-                          style={{ bottom: '-30px' }}
+                    
+                    <PolicyCard
+                      id={policy.id}
+                      title={policy.title}
+                      description={policy.description}
+                      impact={policy.impact}
+                      tier={policy.tier}
+                      cost={policy.cost}
+                      icon={areaIcon}
+                      category={areaId}
+                      isSelected={selectedPolicies.includes(policy.id)}
+                      onClick={() => {}} // Handled by parent div
+                    />
+                    
+                    {isActive && (
+                      <div className="absolute bottom-4 right-4 z-10">
+                        <Button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            onSelectPolicy(policies[1].id, policies[1].tier);
+                            handleSelectPolicy(policy.id, policy.tier);
                           }}
+                          className="bg-primary hover:bg-primary/90 text-white text-sm md:text-base px-2 md:px-4 py-1 md:py-2"
                         >
-                          Select Policy
-                        </button>
-                      ) : (
-                        <div 
-                          className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-black px-3 py-1 rounded-full text-sm font-medium shadow-md hover:bg-gray-100 transition-all z-50 cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectPolicy(policies[1].id, policies[1].tier);
-                          }}
-                        >
-                          <span>Select Policy</span>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-              
-              {/* Option 1 - Bottom card */}
-              <div 
-                key={policies[0].id} 
-                className="absolute inset-x-0 transition-all duration-300 ease-in-out shadow-lg cursor-pointer bg-white"
-                style={{
-                  top: '0px',
-                  height: policies[0].id.includes('psychosocial') ? '32rem' : 
-                         policies[0].id.includes('certification') ? '38rem' : '30rem',
-                  zIndex: activeIndex === 0 ? 40 : 30,
-                  borderRadius: '12px',
-                  transform: activeIndex === 0 ? 'scale(1.02)' : 'scale(1)',
-                }}
-                onClick={() => {
-                  handleCardClick(0);
-                }}
-              >
-                <PolicyCard
-                  id={policies[0].id}
-                  title={policies[0].title}
-                  description={policies[0].description}
-                  impact={policies[0].impact}
-                  tier={policies[0].tier}
-                  icon={areaIcon}
-                  category={areaId}
-                  isSelected={selectedPolicies.includes(policies[0].id)}
-                  onClick={() => handleCardClick(0)}
-                />
-                {activeIndex === 0 && (
-                  <div 
-                    className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-black px-3 py-1 rounded-full text-sm font-medium shadow-md hover:bg-gray-100 transition-all z-40 cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectPolicy(policies[0].id, policies[0].tier);
-                    }}
-                  >
-                    <span>Select Policy</span>
+                          {selectedPolicies.includes(policy.id) ? 'Deselect' : 'Select Policy'}
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+          
+          {/* Mobile-friendly card navigation dots */}
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-50">
+            {policies.map((_, index) => (
+              <button
+                key={index}
+                className={`w-3 h-3 rounded-full ${
+                  index === activeIndex ? 'bg-primary' : 'bg-gray-300'
+                }`}
+                onClick={() => handleCardClick(index)}
+                aria-label={`Go to card ${index + 1}`}
+              />
+            ))}
+          </div>
+          
+          {/* Budget reminder */}
+          <div className="absolute top-2 left-2 z-50">
+            <Badge variant="outline" className="bg-white/90 text-black font-medium px-3 py-1">
+              Budget: 14 Units Total
+            </Badge>
+          </div>
+          
+          {/* Mobile swipe indicator - only shown initially */}
+          <div className="absolute bottom-12 left-0 right-0 flex justify-center z-40 md:hidden">
+            <div className="bg-white/80 text-xs text-gray-600 px-2 py-1 rounded-full">
+              Swipe to navigate cards
             </div>
           </div>
         </div>

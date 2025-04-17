@@ -75,6 +75,8 @@ const ReflectionPrompt: React.FC<ReflectionPromptProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [audioVisualizerData, setAudioVisualizerData] = useState<number[]>([]);
+  const [transcriptQuality, setTranscriptQuality] = useState<'good' | 'poor' | null>(null);
+  const [recordingTranscript, setRecordingTranscript] = useState('');
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -93,24 +95,81 @@ const ReflectionPrompt: React.FC<ReflectionPromptProps> = ({
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
       
-      recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
-        const transcript = Array.from(event.results)
-          .map(result => result[0].transcript)
-          .join('');
-        
-        setResponse(prev => prev + ' ' + transcript);
-      };
-      
-      recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error('Speech recognition error:', event.error);
-        setIsRecording(false);
-      };
+      recognitionRef.current.onresult = onresult;
+      recognitionRef.current.onerror = onerror;
     }
     
     return () => {
       stopRecording();
     };
   }, []);
+  
+  // Handle speech recognition result
+  const onresult = (event: SpeechRecognitionEvent) => {
+    // Get only the most recent transcript instead of joining all previous ones
+    const currentTranscript = event.results[event.resultIndex][0].transcript;
+    
+    // Update the recording transcript state
+    if (event.results[event.resultIndex].isFinal) {
+      // For final results, append to the transcript
+      setRecordingTranscript(prev => prev + currentTranscript);
+      
+      // Update the response field with the new text
+      setResponse(prev => {
+        const trimmedPrev = prev.trim();
+        // Only add a space if there was previous content
+        return trimmedPrev ? `${trimmedPrev} ${currentTranscript.trim()}` : currentTranscript.trim();
+      });
+    } else {
+      // For interim results, show them temporarily
+      const fullTranscript = Array.from(event.results)
+        .map(result => result[0].transcript)
+        .join('');
+      
+      // Display the full current transcript for visualization purposes
+      setRecordingTranscript(fullTranscript);
+    }
+  };
+  
+  // Handle speech recognition error
+  const onerror = (event: SpeechRecognitionErrorEvent) => {
+    console.error('Speech recognition error:', event.error);
+    setIsRecording(false);
+  };
+  
+  // Assess the quality of the transcript
+  const assessTranscriptQuality = (transcript: string): 'good' | 'poor' => {
+    // Convert to lowercase for easier comparison
+    const text = transcript.toLowerCase();
+    
+    // Check for filler words and short responses
+    const fillerWords = ['um', 'uh', 'like', 'you know', 'so', 'yeah'];
+    const wordCount = text.split(/\s+/).filter(word => word.length > 0).length;
+    
+    // Count filler words
+    const fillerCount = fillerWords.reduce((count, filler) => {
+      const regex = new RegExp(`\\b${filler}\\b`, 'g');
+      const matches = text.match(regex) || [];
+      return count + matches.length;
+    }, 0);
+    
+    // Calculate filler word ratio
+    const fillerRatio = wordCount > 0 ? fillerCount / wordCount : 0;
+    
+    // Criteria for poor quality:
+    // 1. Too short (less than 10 meaningful words)
+    // 2. Too many filler words (more than 30% of the content)
+    // 3. Repetitive content
+    if (
+      wordCount < 10 || 
+      fillerRatio > 0.3 || 
+      /([a-zA-Z]{3,})\s+\1\s+\1/.test(text) // Checks for the same word repeated 3+ times
+    ) {
+      return 'poor';
+    }
+    
+    return 'good';
+  };
   
   // Handle recording toggle
   const toggleRecording = async () => {
@@ -126,31 +185,24 @@ const ReflectionPrompt: React.FC<ReflectionPromptProps> = ({
     if (!recognitionRef.current) return;
     
     try {
+      // Reset transcript and quality assessment
+      setRecordingTranscript('');
+      setTranscriptQuality(null);
+      
       // Start audio visualization
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       microphoneStreamRef.current = stream;
       
-      // Set up audio context for visualization
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      analyserRef.current = audioContextRef.current.createAnalyser();
-      const source = audioContextRef.current.createMediaStreamSource(stream);
-      source.connect(analyserRef.current);
+      // Create audio context and analyzer
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContextRef.current = audioContext;
       
-      // Configure analyser
-      analyserRef.current.fftSize = 256;
-      const bufferLength = analyserRef.current.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyserRef.current = analyser;
       
-      // Update visualization data
-      const updateVisualization = () => {
-        if (!isRecording) return;
-        
-        analyserRef.current!.getByteFrequencyData(dataArray);
-        const normalizedData = Array.from(dataArray).map(val => val / 255);
-        setAudioVisualizerData(normalizedData);
-        
-        requestAnimationFrame(updateVisualization);
-      };
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(analyser);
       
       updateVisualization();
       
@@ -164,6 +216,23 @@ const ReflectionPrompt: React.FC<ReflectionPromptProps> = ({
         description: "Could not access your microphone. Please check permissions.",
         variant: "destructive"
       });
+    }
+  };
+  
+  // Update visualization data
+  const updateVisualization = () => {
+    if (!analyserRef.current || !audioContextRef.current) return;
+    
+    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+    analyserRef.current.getByteFrequencyData(dataArray);
+    
+    // Convert to percentage values for visualization
+    const visualData = Array.from(dataArray).map(val => val / 255);
+    setAudioVisualizerData(visualData);
+    
+    // Continue updating if still recording
+    if (isRecording) {
+      requestAnimationFrame(updateVisualization);
     }
   };
   
@@ -185,6 +254,25 @@ const ReflectionPrompt: React.FC<ReflectionPromptProps> = ({
     
     setIsRecording(false);
     setAudioVisualizerData([]);
+    
+    // Only assess quality if we have a substantial transcript
+    // Don't show poor quality message for very short recordings
+    if (recordingTranscript && recordingTranscript.split(' ').length > 3) {
+      const quality = assessTranscriptQuality(recordingTranscript);
+      setTranscriptQuality(quality);
+      
+      if (quality === 'poor') {
+        // If the transcript is poor quality, show a toast notification
+        toast({
+          title: "Low Quality Recording",
+          description: "I'm having trouble understanding what you said. Could you try speaking more clearly?",
+          variant: "destructive"
+        });
+      }
+    } else {
+      // For very short recordings, don't set transcript quality to poor
+      setTranscriptQuality(null);
+    }
   };
   
   // Handle save
@@ -223,6 +311,13 @@ const ReflectionPrompt: React.FC<ReflectionPromptProps> = ({
         {isRecording && (
           <div className="mt-2">
             <VoiceVisualizer data={audioVisualizerData} />
+          </div>
+        )}
+        
+        {/* Transcript quality feedback */}
+        {transcriptQuality === 'poor' && !isRecording && (
+          <div className="mt-2 text-sm text-red-600">
+            Your recording wasn't clear enough. Please try again, speaking more clearly and slowly.
           </div>
         )}
         

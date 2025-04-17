@@ -15,7 +15,8 @@ export const generateGroqResponse = async (params: GroqRequestParams): Promise<s
   try {
     // Check if API key is available
     if (!process.env.NEXT_PUBLIC_GROQ_API_KEY) {
-      throw new Error('Groq API key is not configured');
+      console.warn('Groq API key is not configured');
+      return "";
     }
     
     // Make API request to Groq - using the correct endpoint
@@ -37,22 +38,31 @@ export const generateGroqResponse = async (params: GroqRequestParams): Promise<s
             content: prompt
           }
         ],
-        max_tokens: 250,
-        temperature: 0.7,
+        max_tokens: params.max_tokens || 250,
+        temperature: params.temperature || 0.7,
         top_p: 0.9 // Adding top_p for better response quality
       })
     });
     
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Groq API error: ${errorData.error?.message || response.statusText}`);
+      const errorText = await response.text();
+      let errorMessage = `Groq API error: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = `Groq API error: ${errorData.error?.message || response.statusText}`;
+      } catch (e) {
+        // If parsing fails, use the raw error text
+        errorMessage += ` - ${errorText.substring(0, 100)}`;
+      }
+      console.error(errorMessage);
+      throw new Error(errorMessage);
     }
     
     const data = await response.json();
     return data.choices[0].message.content.trim();
   } catch (error) {
     console.error('Error calling Groq API:', error);
-    throw error;
+    return ""; // Return empty string on error, caller should handle this
   }
 };
 

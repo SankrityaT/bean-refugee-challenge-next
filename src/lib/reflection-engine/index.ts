@@ -29,7 +29,7 @@ export const generateReflection = (selectedPolicies: PolicyOption[]): Reflection
  * Calculates an equity score based on the selected policies
  * Higher tiers and more diverse policy areas contribute to a higher score
  * @param selectedPolicies Array of selected policy options
- * @returns Equity score between 1-10
+ * @returns Equity score between 0-5
  */
 const calculateEquityScore = (selectedPolicies: PolicyOption[]): number => {
   if (!selectedPolicies || selectedPolicies.length === 0) {
@@ -44,10 +44,10 @@ const calculateEquityScore = (selectedPolicies: PolicyOption[]): number => {
   
   // Calculate raw score based on diversity and tier level
   // More diverse policy areas and higher tiers result in higher scores
-  const rawScore = (uniqueAreas / 7) * 5 + (avgTier / 3) * 5;
+  const rawScore = (uniqueAreas / 7) * 2.5 + (avgTier / 3) * 2.5;
   
-  // Normalize to 1-10 scale and round to one decimal place
-  return Math.min(10, Math.max(1, Math.round(rawScore * 10) / 10));
+  // Normalize to 0-5 scale and round to one decimal place
+  return Math.min(5, Math.max(0, Math.round(rawScore * 10) / 10));
 };
 
 /**

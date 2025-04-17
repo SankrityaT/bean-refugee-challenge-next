@@ -17,7 +17,7 @@ const FinancialSupportCard: React.FC<FinancialSupportCardProps> = ({
   disadvantage
 }) => {
   return (
-    <div className="w-72 h-[32rem] bg-white rounded-xl border-2 border-gray-300 shadow-md overflow-visible flex flex-col pb-8">
+    <div className="w-80 h-[32rem] bg-white rounded-xl border-2 border-gray-300 shadow-md overflow-hidden flex flex-col">
       {/* Top Header (Orange) */}
       <div className="bg-[#F46A1F] px-4 py-3">
         <h2 className="text-lg font-bold text-white truncate">{title}</h2>
@@ -50,17 +50,12 @@ const FinancialSupportCard: React.FC<FinancialSupportCardProps> = ({
         </div>
       </div>
 
-      {/* Bottom Orange Footer + Dollar Icon + Bottom Bar */}
+      {/* Bottom Orange Footer + Dollar Icon */}
       <div className="relative mt-auto">
-        {/* Rounded bottom of card */}
-        <div className="h-6 w-full rounded-b-xl bg-[#F46A1F]"></div>
-        
-        {/* Full width orange bar below the semicircle */}
-        <div className="absolute -bottom-8 w-full h-8 bg-[#F46A1F] z-0"></div>
-        
-        {/* Half circle with dollar icon */}
-        <div className="absolute bottom-0 left-1/2 z-10 -translate-x-1/2 transform">
-          <div className="flex h-20 w-28 items-center justify-center rounded-t-full bg-[#F46A1F]">
+        <div className="bg-[#F46A1F] h-6 w-full rounded-b-xl"></div>
+
+        <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 z-10">
+          <div className="w-28 h-20 bg-[#F46A1F] rounded-t-full flex items-center justify-center">
             {/* Dollar Icon */}
             <svg className="h-12 w-12 text-white" fill="currentColor" viewBox="0 0 24 24">
               <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>

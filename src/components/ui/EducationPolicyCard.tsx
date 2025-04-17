@@ -17,8 +17,8 @@ const EducationPolicyCard: React.FC<EducationPolicyCardProps> = ({
   disadvantage
 }) => {
   return (
-    <div className="w-72 h-[30rem] bg-white rounded-xl border-2 border-gray-300 shadow-md overflow-hidden flex flex-col">
-      {/* Top Header (Cyan Blue) */}
+    <div className="w-80 h-[32rem] bg-white rounded-xl border-2 border-gray-300 shadow-md overflow-hidden flex flex-col">
+      {/* Top Header */}
       <div className="bg-[#A0F6DA] px-4 py-3">
         <h2 className="text-black font-bold text-lg truncate">{title}</h2>
       </div>
@@ -50,7 +50,7 @@ const EducationPolicyCard: React.FC<EducationPolicyCardProps> = ({
         </div>
       </div>
 
-      {/* Bottom Cyan Footer + Graduation Cap Icon */}
+      {/* Bottom Footer */}
       <div className="relative mt-auto">
         <div className="bg-[#A0F6DA] h-6 w-full rounded-b-xl"></div>
 

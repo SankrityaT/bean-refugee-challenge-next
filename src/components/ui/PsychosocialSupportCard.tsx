@@ -17,7 +17,7 @@ const PsychosocialSupportCard: React.FC<PsychosocialSupportCardProps> = ({
   disadvantage
 }) => {
   return (
-    <div className="w-72 h-[32rem] bg-white rounded-xl border-2 border-gray-300 shadow-md overflow-visible flex flex-col">
+    <div className="w-80 h-[32rem] bg-white rounded-xl border-2 border-gray-300 shadow-md overflow-hidden flex flex-col">
       {/* Top Header (Blue) */}
       <div className="bg-[#5CCBFF] px-4 py-3">
         <h2 className="text-white font-bold text-lg truncate">{title}</h2>

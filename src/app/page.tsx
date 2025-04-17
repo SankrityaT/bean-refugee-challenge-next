@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Book, Play, Users, DollarSign, School, BrainCircuit, Lightbulb } from "lucide-react";
 import { InfiniteMovingCards } from "@/components/ui/infinite-moving-cards";
 import { BentoGrid, BentoGridItem } from "@/components/ui/bento-grid";
-// Remove this import as we won't need it anymore
-// import CustomScrollbar from "@/components/ui/custom-scrollbar";
 
 // Rainbow stripe component (top + bottom)
 const RainbowStripe = () => (
@@ -38,12 +36,8 @@ export default function Home() {
     router.push('/policy-selection');
   };
   
-  // Remove the useEffect that was for the custom scrollbar
-
   return (
     <div className="min-h-screen bg-[#eac95d] text-white flex flex-col font-sans relative overflow-hidden">
-      {/* Remove the CustomScrollbar component */}
-      
       <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))] opacity-30" />
       
       {/* 🔺 Rainbow Top Bar */}
@@ -64,7 +58,7 @@ export default function Home() {
               <span className="text-[#80C9D5] font-serif font-bold text-4xl sm:text-5xl md:text-7xl lg:text-8xl tracking-tight">G</span>
               <span className="text-[#E148A1] font-serif font-bold text-4xl sm:text-5xl md:text-7xl lg:text-8xl tracking-tight">E</span>
             </h1>
-            <p className="text-center text-gray-800 text-lg sm:text-xl md:text-2xl font-light">
+            <p className="text-center text-gray-800 text-lg sm:text-xl md:text-2xl font-bold">
               Creating Holistic Approaches for Learning, Liberty, and Equity in New Global Education
             </p>
           </div>

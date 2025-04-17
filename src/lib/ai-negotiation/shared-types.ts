@@ -20,4 +20,6 @@ export interface GroqRequestParams {
   sentiment: SentimentType;
   conversationContext?: string;
   mustRespondToUser?: boolean;
+  temperature?: number;
+  max_tokens?: number;
 }

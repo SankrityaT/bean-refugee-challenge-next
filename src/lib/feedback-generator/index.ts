@@ -52,30 +52,17 @@ export const generatePolicyFeedback = async (
     .join('\n');
 
   // Create an enhanced prompt for the Groq API
-  const prompt = `
-You are an educational policy expert with a focus on refugee education and social justice. 
-You're providing feedback on a policy package created by a participant in a simulation game about refugee education policy.
+  const prompt = `You are an educational policy expert focusing on refugee education and social justice. Provide a VERY CONCISE analysis of this policy package. Selected policies: ${policiesText} Equity score: ${reflectionData.equityScore}/5
 
-The participant has selected the following policies:
-${policiesText}
+In your response, format it as follows WITHOUT using bullet points or list markers:
 
-Their policy package received an equity score of ${reflectionData.equityScore}/5 based on UNESCO inclusion metrics.
+STRENGTHS: [Key strengths of the policy package in relation to equity and inclusion]
 
-I've identified some specific policy interactions in their choices:
-${relevantInteractions || "No specific interactions identified."}
+CONCERNS: [Areas where the policy package falls short or could improve for better equity]
 
-I've also identified these potential ethical tensions:
-${relevantDilemmas || "No specific ethical dilemmas identified."}
+RECOMMENDATIONS: [1-2 specific recommendations for strengthening the policy package]
 
-Please provide a 4-5 paragraph analysis of their policy choices that:
-1. Evaluates the overall coherence and justice-orientation of their policy package
-2. Discusses the specific policy interactions and tensions noted above
-3. Analyzes long-term implications for refugee inclusion and educational equity
-4. Offers these concrete transformative suggestions:
-${relevantSuggestions || "Suggestions for more transformative approaches."}
-
-Your feedback must be personalized to their specific policy choices, educational in tone, and grounded in principles of social justice and refugee rights. Reference specific policies by name and discuss their interactions. Avoid generic responses.
-`;
+Keep your entire analysis under 250 words total, with concise, direct language. Do not use bullet points or list markers.`;
 
   try {
     // Check if API key is available
@@ -95,7 +82,7 @@ Your feedback must be personalized to their specific policy choices, educational
         messages: [
           {
             role: 'system',
-            content: 'You are an educational policy expert specializing in refugee education and social justice. Your feedback should be deeply personalized, ethics-focused, and provide concrete examples and actionable suggestions.'
+            content: 'You are an educational policy expert providing extremely concise, actionable feedback. Keep your response under 250 words total.'
           },
           {
             role: 'user',
@@ -103,7 +90,7 @@ Your feedback must be personalized to their specific policy choices, educational
           }
         ],
         temperature: 0.7,
-        max_tokens: 1200
+        max_tokens: 350
       })
     });
 

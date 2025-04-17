@@ -5,6 +5,7 @@ import PolicyCard from './PolicyCard';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
+// Add to your imports at the top of the file
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface StackedPolicyCardsProps {
@@ -23,7 +24,6 @@ const StackedPolicyCards: React.FC<StackedPolicyCardsProps> = ({
   onSelectPolicy
 }) => {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [showAll, setShowAll] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerHeight, setContainerHeight] = useState(0);
   
@@ -98,6 +98,10 @@ const StackedPolicyCards: React.FC<StackedPolicyCardsProps> = ({
     }
   };
 
+  // Add state to track if "Show All" is clicked
+  const [showAll, setShowAll] = useState(false);
+  
+  // In the return statement, update the container's height based on showAll state
   return (
     <div 
       className="relative w-full" 
@@ -159,23 +163,22 @@ const StackedPolicyCards: React.FC<StackedPolicyCardsProps> = ({
       ) : (
         // Stacked view - cards stacked with active card on top
         <div className="relative h-full flex items-center justify-center overflow-hidden">
-          {/* Left navigation arrow for desktop */}
+          {/* Left navigation arrow for desktop - REMOVE the hidden md:block class */}
           <button 
-            onClick={goToPrevious}
-            className="absolute left-1 md:left-4 z-40 bg-white/80 rounded-full p-1 md:p-2 shadow-md hidden md:block"
-            aria-label="Previous card"
-          >
-            <ChevronLeft className="h-5 w-5 md:h-6 md:w-6" />
-          </button>
-          
-          {/* Right navigation arrow for desktop */}
-          <button 
-            onClick={goToNext}
-            className="absolute right-1 md:right-4 z-40 bg-white/80 rounded-full p-1 md:p-2 shadow-md hidden md:block"
-            aria-label="Next card"
-          >
-            <ChevronRight className="h-5 w-5 md:h-6 md:w-6" />
-          </button>
+  onClick={goToPrevious}
+  className="absolute left-1 md:left-4 z-50 bg-white rounded-full p-1 md:p-2 shadow-lg hover:bg-gray-100"
+  aria-label="Previous card"
+>
+  <ChevronLeft className="h-5 w-5 md:h-6 md:w-6 text-gray-800" />
+</button>
+
+<button 
+  onClick={goToNext}
+  className="absolute right-1 md:right-4 z-50 bg-white rounded-full p-1 md:p-2 shadow-lg hover:bg-gray-100"
+  aria-label="Next card"
+>
+  <ChevronRight className="h-5 w-5 md:h-6 md:w-6 text-gray-800" />
+</button>
           
           <AnimatePresence>
             {policies.map((policy, index) => {

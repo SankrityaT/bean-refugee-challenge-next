@@ -6,8 +6,9 @@ import {
   ToastProps,
 } from "@/components/ui/toast"
 
+// Update the TOAST_REMOVE_DELAY to make toasts stay longer
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 8000 // 8 seconds for better visibility
 
 type ToasterToast = ToastProps & {
   id: string

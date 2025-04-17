@@ -7,45 +7,78 @@ interface BudgetIndicatorProps {
   allocatedBudget: number;
   isValid?: boolean;
   warnings?: string[];
+  selectedPolicies?: Array<{id: string, tier: number, category: string}>;
 }
 
 const BudgetIndicator: React.FC<BudgetIndicatorProps> = ({ 
   totalBudget, 
   allocatedBudget,
   isValid = true,
-  warnings = []
+  warnings = [],
+  selectedPolicies = []
 }) => {
-  const percentUsed = (allocatedBudget / totalBudget) * 100;
-  const isOverBudget = allocatedBudget > totalBudget;
+  // Calculate percentage for progress bar
+  const percentage = Math.min(100, (allocatedBudget / totalBudget) * 100);
+  
+  // Generate segments for the progress bar based on selected policies
+  const segments = selectedPolicies.map(policy => ({
+    id: policy.id,
+    percentage: (policy.tier / totalBudget) * 100,
+    category: policy.category
+  }));
+  
+  // Function to get color based on category
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'access': return '#A0F6DA';
+      case 'language': return '#FED64D';
+      case 'teacher': return '#EF5EFF';
+      case 'curriculum': return '#7FFF2A';
+      case 'psychosocial': return '#5CCBFF';
+      case 'financial': return '#F46A1F';
+      case 'certification': return '#A0522D';
+      default: return '#CCCCCC';
+    }
+  };
   
   return (
-    <div>
-      <Progress 
-        value={percentUsed > 100 ? 100 : percentUsed} 
-        className={`h-3 ${isOverBudget ? 'bg-gray-200' : 'bg-gray-100'}`}
-        indicatorClassName={!isValid ? 'bg-warning-orange' : 'bg-progress-green'}
-      />
+    <div className="space-y-2">
+      <div className="relative h-4 w-full overflow-hidden rounded-full bg-gray-200">
+        {/* Render segments for each policy */}
+        {segments.map((segment, index) => {
+          // Calculate the left position based on previous segments
+          const leftPosition = segments
+            .slice(0, index)
+            .reduce((acc, curr) => acc + curr.percentage, 0);
+            
+          return (
+            <div 
+              key={segment.id}
+              className="absolute top-0 h-full"
+              style={{
+                left: `${leftPosition}%`,
+                width: `${segment.percentage}%`,
+                backgroundColor: getCategoryColor(segment.category),
+                transition: 'all 0.3s ease'
+              }}
+            />
+          );
+        })}
+        
+        {/* Fallback progress bar if no segments */}
+        {segments.length === 0 && (
+          <div 
+            className={`h-full transition-all duration-300 ${!isValid ? 'bg-red-500' : 'bg-emerald-500'}`}
+            style={{ width: `${percentage}%` }}
+          />
+        )}
+      </div>
       
       {warnings.length > 0 && (
-        <div className="mt-2">
-          {warnings.map((warning, index) => (
-            <p key={index} className="text-warning-orange text-sm font-semibold">
-              Warning: {warning}
-            </p>
-          ))}
-        </div>
-      )}
-      
-      {isValid && allocatedBudget >= totalBudget * 0.85 && (
-        <p className="text-amber-500 text-sm mt-2">
-          You're approaching your budget limit!
+        <p className={`text-sm ${!isValid ? 'text-red-500' : 'text-amber-500'}`}>
+          Warning: {warnings[0]}
         </p>
       )}
-      
-      <div className="mt-2 text-xs text-gray-500">
-        <span className="font-medium">Tier System:</span> Each policy has a tier value (1-3). 
-        Your total cannot exceed 14 units and must include at least 2 different tier levels.
-      </div>
     </div>
   );
 };

@@ -34,13 +34,19 @@ interface ConversationManagerProps {
   }[];
   onConversationUpdate: (logs: any[]) => void;
   userTitle?: string;
+  showMic?: boolean;
+  showAgentVoice?: boolean;
+  showEmotion?: boolean;
 }
 
 const ConversationManager: React.FC<ConversationManagerProps> = ({
   selectedPolicies,
   agents,
   onConversationUpdate,
-  userTitle = "Policy Advisor"
+  userTitle = "Policy Advisor",
+  showMic = true,
+  showAgentVoice = true,
+  showEmotion = true
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState('');
@@ -53,23 +59,28 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
   const [speechError, setSpeechError] = useState<string | null>(null);
   const [waitingForUserResponse, setWaitingForUserResponse] = useState(false);
   const [showFullHistory, setShowFullHistory] = useState(false);
-  
+  const [isAgentLoading, setIsAgentLoading] = useState(false);
+  const [lastAgent, setLastAgent] = useState<string | null>(null);
+
   const { toast } = useToast();
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const conversationStarted = useRef(false);
   const retryCountRef = useRef(0);
-  
-  // Check if speech recognition is supported
+
   useEffect(() => {
     setSpeechSupported(isSpeechRecognitionSupported());
-    
-    // Start conversation with welcome message
+
+    return () => {
+      stopSpeechRecognition();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!conversationStarted.current && agents.length > 0) {
       conversationStarted.current = true;
-      
-      // Add welcome message
+
       const welcomeMessage: Message = {
         id: `system-${Date.now()}`,
         sender: userTitle,
@@ -78,110 +89,91 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
         emotion: 'neutral',
         isUser: true
       };
-      
+
       setMessages([welcomeMessage]);
-      
-      // Schedule first agent to speak after 2 seconds
+
       setTimeout(() => {
         triggerAgentResponse(agents[0].name);
       }, 2000);
     }
-    
-    return () => {
-      // Clean up speech recognition when component unmounts
-      stopSpeechRecognition();
-    };
-  }, []);
-  
-  // Scroll to bottom when messages change
+  }, [agents, userTitle]);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-  
-  // Update conversation logs for parent component
+
   useEffect(() => {
-    const logs = messages.map(msg => ({
-      agent: msg.sender,
-      content: msg.content,
-      timestamp: msg.timestamp.toISOString(),
-      emotion: msg.emotion,
-      isUser: msg.isUser
-    }));
-    
+    const logs = messages.map(msg => {
+      if (msg.isUser) {
+        return {
+          agent: msg.respondingTo || '',
+          content: msg.content,
+          timestamp: msg.timestamp.toISOString(),
+          emotion: msg.emotion,
+          isUser: msg.isUser
+        };
+      } else {
+        return {
+          agent: msg.sender,
+          content: msg.content,
+          timestamp: msg.timestamp.toISOString(),
+          emotion: msg.emotion,
+          isUser: msg.isUser
+        };
+      }
+    });
     onConversationUpdate(logs);
   }, [messages, onConversationUpdate]);
-  
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
-  
-  // Function to determine which agent should respond next
+
   const getNextRespondingAgent = (allAgents: any[]): any => {
-    // Find which agents have already spoken
     const agentsWhoSpoke = new Set(
       messages
         .filter(msg => !msg.isUser && allAgents.some(a => a.name === msg.sender))
         .map(msg => msg.sender)
     );
-    
-    // Find the next agent who hasn't spoken yet
     const nextAgent = allAgents.find(a => !agentsWhoSpoke.has(a.name));
-    
-    // If all agents have spoken, pick a random one who hasn't spoken recently
     if (nextAgent) {
       return nextAgent;
     } else {
-      // All agents have spoken at least once, pick one who hasn't spoken recently
-      // Exclude the most recent agent who spoke
       const recentSpeakers = messages
         .slice(-4)
         .filter(msg => !msg.isUser)
         .map(msg => msg.sender);
-      
       const availableAgents = allAgents.filter(a => !recentSpeakers.includes(a.name));
-      
-      // If all agents spoke recently, pick a random one
       const agentPool = availableAgents.length > 0 ? availableAgents : allAgents;
       return agentPool[Math.floor(Math.random() * agentPool.length)];
     }
   };
 
-  // Function to handle sending user messages
   const handleSendMessage = async () => {
     if (!userInput.trim()) return;
-    
-    // Set loading state
-    const isProcessing = true;
-    
+    if (isListening) {
+      stopSpeechRecognition();
+      setIsListening(false);
+    }
     try {
-      // Detect emotion from user input using Hume AI
       const detectedEmotion = await detectEmotionsWithHume(userInput);
       setUserEmotion(detectedEmotion);
-      
-      // Add user message
       const userMessage: Message = {
         id: `user-${Date.now()}`,
         sender: userTitle,
         content: userInput,
         timestamp: new Date(),
         emotion: detectedEmotion,
-        isUser: true
+        isUser: true,
+        respondingTo: lastAgent
       };
-      
       const updatedMessages = [...messages, userMessage];
       setMessages(updatedMessages);
       setUserInput('');
-      
-      // Update conversation logs
       onConversationUpdate(updatedMessages);
-      
-      // Reset waiting for user response flag
       setWaitingForUserResponse(false);
-      
-      // Automatically trigger a response from one of the agents after user sends a message
       const nextAgent = getNextRespondingAgent(agents);
       if (nextAgent) {
-        // Wait a short moment before agent responds (for natural conversation flow)
         setTimeout(() => {
           triggerAgentResponse(nextAgent.name, userMessage.id);
         }, 1000);
@@ -195,157 +187,90 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
       });
     }
   };
-  
-  // Analyze user input to detect emotion - DEPRECATED, now using Hume AI
-  const analyzeUserEmotion = (text: string): string => {
-    // This function is kept for fallback purposes but is no longer the primary emotion detection method
-    const lowerInput = text.toLowerCase();
-    
-    // Simple keyword-based emotion detection
-    if (lowerInput.includes('angry') || lowerInput.includes('upset') || 
-        lowerInput.includes('unfair') || lowerInput.includes('ridiculous')) {
-      return 'anger';
-    }
-    
-    if (lowerInput.includes('worried') || lowerInput.includes('concern') || 
-        lowerInput.includes('afraid') || lowerInput.includes('risk')) {
-      return 'concern';
-    }
-    
-    if (lowerInput.includes('happy') || lowerInput.includes('excited') || 
-        lowerInput.includes('great') || lowerInput.includes('excellent')) {
-      return 'enthusiasm';
-    }
-    
-    if (lowerInput.includes('sad') || lowerInput.includes('disappointed') || 
-        lowerInput.includes('unfortunate')) {
-      return 'frustration';
-    }
-    
-    if (lowerInput.includes('help') || lowerInput.includes('support') || 
-        lowerInput.includes('care') || lowerInput.includes('understand')) {
-      return 'compassion';
-    }
-    
-    return 'neutral';
-  };
-  
-  // Find the last user message
+
   const findLastUserMessage = (messages: Message[]): Message | undefined => {
     return messages
       .filter(msg => msg.isUser)
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
       .shift();
   };
-  
-  // Trigger an agent to respond
+
   const triggerAgentResponse = async (agentName: string, respondToUserId: string | null = null) => {
     setActiveAgent(agentName);
-    setIsSpeaking(true);
-    
-    // Find the agent's data
+    setIsAgentLoading(true);
+    setIsSpeaking(false);
+    setLastAgent(agentName);
     const agent = agents.find(a => a.name === agentName);
     if (!agent) return;
-    
     try {
-      // Find the last user message to ensure the agent responds to it
       const lastUserMessage = findLastUserMessage(messages);
       const lastUserMessageId = respondToUserId || (lastUserMessage ? lastUserMessage.id : null);
-      
-      // Generate agent response
       const response = await fetch('/api/generate-response', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agentName,
           agentStance: agent.stance,
           selectedPolicies,
-          previousMessages: messages.slice(-5), // Send last 5 messages for context
-          respondToUserId: lastUserMessageId // Explicitly tell the API which message to respond to
+          previousMessages: messages.slice(-5),
+          respondToUserId: lastUserMessageId
         })
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to generate response');
-      }
-      
+      if (!response.ok) throw new Error('Failed to generate response');
       const data = await response.json();
-      const { message, emotion } = data;
-      
-      // Set current emotion for visualization
+      const { message } = data;
+      // Fetch emotion from Hume API backend for the agent's message
+      let emotion = 'neutral';
+      try {
+        emotion = await detectEmotionsWithHume(message);
+      } catch (emotionErr) {
+        console.error('Hume emotion fetch failed:', emotionErr);
+        emotion = 'neutral';
+      }
       setCurrentEmotion(emotion);
-      
-      // Add agent message
-      // In the message rendering section, check if the emotion is being passed to the EmotionAvatar component
-      
-      // The issue might be in how messages are displayed in the UI
-      // Make sure each agent message includes the emotion property and it's being passed to the EmotionAvatar
-      
-      // Check the part where agent messages are added to the state
       const agentMessage: Message = {
         id: `${agentName.toLowerCase().replace(' ', '-')}-${Date.now()}`,
         sender: agentName,
-        content: message,
+        content: message, // transcript
         timestamp: new Date(),
-        emotion, // Make sure this is being set correctly
+        emotion,
         respondingTo: lastUserMessageId
       };
-      
       setMessages(prev => [...prev, agentMessage]);
-      
-      // Use Hume TTS API to speak the message with emotion
       try {
         await speakWithEmotion(
           message,
           agentName,
           emotion as EmotionType,
+          () => { setIsAgentLoading(false); setIsSpeaking(true); },
           () => {
-            // Speech started callback
-            console.log(`${agentName} started speaking`);
-          },
-          () => {
-            // Speech ended callback
-            console.log(`${agentName} finished speaking`);
             setIsSpeaking(false);
             setActiveAgent(null);
-            
-            // After agent speaks, wait for user response
             toast({
               title: "Your turn to respond",
               description: "Click the microphone button or type your response",
             });
-            
-            // Set a flag indicating we're waiting for user response
             setWaitingForUserResponse(true);
           }
         );
       } catch (error) {
         console.error('Error with speech synthesis:', error);
-        // Fallback to timer-based approach if speech synthesis fails
         const speakingTime = Math.min(Math.max(message.length * 50, 3000), 10000);
         setTimeout(() => {
           setIsSpeaking(false);
           setActiveAgent(null);
-          
-          // After agent speaks, wait for user response
           toast({
             title: "Your turn to respond",
             description: "Click the microphone button or type your response",
           });
-          
-          // Set a flag indicating we're waiting for user response
           setWaitingForUserResponse(true);
         }, speakingTime);
       }
-      
     } catch (error) {
       console.error('Error generating agent response:', error);
+      setIsAgentLoading(false);
       setIsSpeaking(false);
       setActiveAgent(null);
-      
-      // Add fallback message
       const fallbackMessage: Message = {
         id: `${agentName.toLowerCase().replace(' ', '-')}-fallback-${Date.now()}`,
         sender: agentName,
@@ -353,14 +278,11 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
         timestamp: new Date(),
         emotion: 'neutral'
       };
-      
       setMessages(prev => [...prev, fallbackMessage]);
-      
-      // Even with error, we still wait for user response
       setWaitingForUserResponse(true);
     }
   };
-  
+
   const toggleSpeechRecognition = () => {
     if (!speechSupported) {
       toast({
@@ -370,61 +292,35 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
       });
       return;
     }
-    
     if (isListening) {
-      // User manually stopped speaking
       stopSpeechRecognition();
       setIsListening(false);
       setSpeechError(null);
-      
-      // Don't auto-send - let the user decide when to send
       toast({
         title: "Recording stopped",
         description: "Press send when you're ready to submit your response",
       });
     } else {
-      // Make sure we're not speaking before starting recognition
       if (isSpeaking) {
-        console.log('Cannot start speech recognition while agent is speaking');
         setSpeechError('Please wait for the speaker to finish');
         return;
       }
-      
-      // Clear any previous error
       setSpeechError(null);
-      
       const success = startSpeechRecognition({
         onStart: () => {
           setIsListening(true);
           setSpeechError(null);
-          console.log('Speech recognition started');
-          
-          // Show a toast to indicate recording has started
           toast({
             title: "Listening...",
             description: "Speak clearly, then click the mic button again when finished",
           });
         },
-        onEnd: () => {
-          // Don't automatically set isListening to false
-          // This will be handled by the user clicking the mic button again
-          console.log('Speech recognition ended');
-          
-          // Don't auto-send message - let the user decide when to send
-        },
-        onResult: (transcript) => {
-          setUserInput(transcript);
-          console.log('Speech recognition result:', transcript);
-        },
+        onEnd: () => {},
+        onResult: (transcript) => { setUserInput(transcript); },
         onError: (error) => {
-          console.error('Speech recognition error:', error);
           setIsListening(false);
-          
-          // Only show error if it's not a no-speech error (which is common and not a real error)
           if (!error.includes('no-speech')) {
             setSpeechError(error);
-            
-            // Show toast notification for network errors
             if (error.includes('Network error')) {
               toast({
                 title: "Speech Recognition Error",
@@ -435,12 +331,9 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
           }
         }
       });
-      
       if (!success) {
-        console.error('Failed to start speech recognition');
         setIsListening(false);
         setSpeechError('Speech recognition not available');
-        
         toast({
           title: "Speech Recognition Unavailable",
           description: "Your browser may not support this feature. Try using text input instead.",
@@ -449,9 +342,9 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
       }
     }
   };
-  
+
   return (
-    <div className="flex flex-col h-full bg-white rounded-lg shadow-sm overflow-hidden">
+    <div className="flex flex-col h-full bg-white rounded-lg shadow-sm overflow-hidden text-black relative">
       {/* Live Debate Section */}
       <div className="bg-policy-maroon text-white p-3 flex justify-between items-center">
         <h2 className="text-xl font-bold">LIVE POLICY DEBATE</h2>
@@ -460,234 +353,81 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
           <span className="text-sm">LIVE</span>
         </div>
       </div>
-      
       {/* Five Speaker Boxes Layout */}
       <div className="flex-1 bg-gray-50 p-3">
         <div className="grid grid-cols-4 grid-rows-2 gap-3 h-full">
+          {/* Loading indicator overlay when waiting for agent response */}
+          {isAgentLoading && activeAgent && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-3 animate-fade-in">
+                <svg className="animate-spin h-8 w-8 text-policy-maroon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                </svg>
+                <div className="text-lg font-semibold text-policy-maroon">{activeAgent} is preparing their response...</div>
+                <div className="text-sm text-gray-600">Please wait for the agent to speak</div>
+              </div>
+            </div>
+          )}
           {/* Top Row - 4 agents */}
-          <div 
-            className={`bg-white rounded-lg shadow-sm p-3 flex flex-col ${
-              activeAgent === 'Minister Santos' ? 'ring-2 ring-policy-maroon' : ''
-            }`}
-          >
-            <div className="flex items-center mb-2">
-              <EmotionAvatar
-                agentName="Minister Santos"
-                emotion={messages.filter(msg => msg.sender === 'Minister Santos').slice(-1)[0]?.emotion as EmotionType || 'neutral'}
-                isActive={activeAgent === 'Minister Santos'}
-                size="md"
-                className="mr-2"
-              />
-              <div>
-                <div className="font-medium text-sm">Minister Santos</div>
-                <div className="text-xs text-gray-500">Education Minister</div>
-              </div>
-              <div className="ml-auto flex flex-col items-end gap-1">
-                {activeAgent === 'Minister Santos' && (
-                  <div className="flex items-center">
-                    <div className="h-2 w-2 bg-green-500 rounded-full mr-1"></div>
-                    <span className="text-xs text-green-600">Speaking</span>
-                  </div>
-                )}
-                {messages.filter(msg => msg.sender === 'Minister Santos').length > 0 && (
-                  <EmotionMeter 
-                    emotion={messages.filter(msg => msg.sender === 'Minister Santos').slice(-1)[0]?.emotion as EmotionType || 'neutral'}
-                    size="sm"
-                    showIntensity={true}
-                  />
-                )}
-              </div>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto text-sm">
-              {messages
-                .filter(msg => msg.sender === 'Minister Santos')
-                .slice(-1)
-                .map(msg => (
-                  <div key={msg.id}>
-                    <div className="text-xs text-gray-500 mb-1">
-                      {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+          {agents.slice(0, 4).map((agent, index) => (
+            <div 
+              key={agent.name} 
+              className={`bg-white rounded-lg shadow-sm p-3 flex flex-col overflow-hidden ${
+                activeAgent === agent.name ? 'ring-2 ring-policy-maroon' : ''
+              }`}
+            >
+              <div className="flex items-center mb-2">
+                <EmotionAvatar
+                  agentName={agent.name}
+                  emotion={messages.filter(msg => msg.sender === agent.name).slice(-1)[0]?.emotion as EmotionType || 'neutral'}
+                  isActive={activeAgent === agent.name}
+                  size="md"
+                  className="mr-2 shrink-0 min-w-0 max-w-[2.5rem]"
+                />
+                <div>
+                  <div className="font-medium text-sm">{agent.name}</div>
+                  <div className="text-xs text-gray-500">{agent.role}</div>
+                </div>
+                <div className="ml-auto flex flex-col items-end gap-1">
+                  {activeAgent === agent.name && (
+                    <div className="flex items-center">
+                      <div className="h-2 w-2 bg-green-500 rounded-full mr-1"></div>
+                      <span className="text-xs text-green-600">Speaking</span>
                     </div>
-                    <div>{msg.content}</div>
-                  </div>
-                ))}
-              {messages.filter(msg => msg.sender === 'Minister Santos').length === 0 && (
-                <div className="text-gray-400 italic">No messages yet</div>
-              )}
-            </div>
-            
-            <div className="mt-2 text-xs px-2 py-1 bg-gray-100 rounded-full self-start">
-              NEOLIBERAL
-            </div>
-          </div>
-          
-          <div 
-            className={`bg-white rounded-lg shadow-sm p-3 flex flex-col ${
-              activeAgent === 'Dr. Chen' ? 'ring-2 ring-policy-maroon' : ''
-            }`}
-          >
-            <div className="flex items-center mb-2">
-              <EmotionAvatar
-                agentName="Dr. Chen"
-                emotion={messages.filter(msg => msg.sender === 'Dr. Chen').slice(-1)[0]?.emotion as EmotionType || 'neutral'}
-                isActive={activeAgent === 'Dr. Chen'}
-                size="md"
-                className="mr-2"
-              />
-              <div>
-                <div className="font-medium text-sm">Dr. Chen</div>
-                <div className="text-xs text-gray-500">Education Researcher</div>
+                  )}
+                </div>
               </div>
-              <div className="ml-auto flex flex-col items-end gap-1">
-                {activeAgent === 'Dr. Chen' && (
-                  <div className="flex items-center">
-                    <div className="h-2 w-2 bg-green-500 rounded-full mr-1"></div>
-                    <span className="text-xs text-green-600">Speaking</span>
-                  </div>
-                )}
-                {messages.filter(msg => msg.sender === 'Dr. Chen').length > 0 && (
-                  <EmotionMeter 
-                    emotion={messages.filter(msg => msg.sender === 'Dr. Chen').slice(-1)[0]?.emotion as EmotionType || 'neutral'}
-                    size="sm"
-                    showIntensity={true}
-                  />
-                )}
-              </div>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto text-sm">
-              {messages
-                .filter(msg => msg.sender === 'Dr. Chen')
-                .slice(-1)
-                .map(msg => (
-                  <div key={msg.id}>
-                    <div className="text-xs text-gray-500 mb-1">
-                      {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+              
+              <div className="flex-1 overflow-y-auto text-sm text-black">
+                {messages
+                  .filter(msg => msg.sender === agent.name)
+                  .slice(-1)
+                  .map(msg => (
+                    <div key={msg.id}>
+                      <div className="text-xs text-gray-500 mb-1">
+                        {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </div>
+                      <div>{msg.content}</div>
+                      <div className="mt-1">
+                        <EmotionMeter 
+                          emotion={msg.emotion as EmotionType || 'neutral'}
+                          size="sm"
+                          showIntensity={true}
+                        />
+                      </div>
                     </div>
-                    <div>{msg.content}</div>
-                  </div>
-                ))}
-              {messages.filter(msg => msg.sender === 'Dr. Chen').length === 0 && (
-                <div className="text-gray-400 italic">No messages yet</div>
-              )}
-            </div>
-            
-            <div className="mt-2 text-xs px-2 py-1 bg-gray-100 rounded-full self-start">
-              PROGRESSIVE
-            </div>
-          </div>
-          
-          <div 
-            className={`bg-white rounded-lg shadow-sm p-3 flex flex-col ${
-              activeAgent === 'Mayor Okonjo' ? 'ring-2 ring-policy-maroon' : ''
-            }`}
-          >
-            <div className="flex items-center mb-2">
-              <EmotionAvatar
-                agentName="Mayor Okonjo"
-                emotion={messages.filter(msg => msg.sender === 'Mayor Okonjo').slice(-1)[0]?.emotion as EmotionType || 'neutral'}
-                isActive={activeAgent === 'Mayor Okonjo'}
-                size="md"
-                className="mr-2"
-              />
-              <div>
-                <div className="font-medium text-sm">Mayor Okonjo</div>
-                <div className="text-xs text-gray-500">City Mayor</div>
-              </div>
-              <div className="ml-auto flex flex-col items-end gap-1">
-                {activeAgent === 'Mayor Okonjo' && (
-                  <div className="flex items-center">
-                    <div className="h-2 w-2 bg-green-500 rounded-full mr-1"></div>
-                    <span className="text-xs text-green-600">Speaking</span>
-                  </div>
-                )}
-                {messages.filter(msg => msg.sender === 'Mayor Okonjo').length > 0 && (
-                  <EmotionMeter 
-                    emotion={messages.filter(msg => msg.sender === 'Mayor Okonjo').slice(-1)[0]?.emotion as EmotionType || 'neutral'}
-                    size="sm"
-                    showIntensity={true}
-                  />
+                  ))}
+                {messages.filter(msg => msg.sender === agent.name).length === 0 && (
+                  <div className="text-gray-400 italic">No messages yet</div>
                 )}
               </div>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto text-sm">
-              {messages
-                .filter(msg => msg.sender === 'Mayor Okonjo')
-                .slice(-1)
-                .map(msg => (
-                  <div key={msg.id}>
-                    <div className="text-xs text-gray-500 mb-1">
-                      {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </div>
-                    <div>{msg.content}</div>
-                  </div>
-                ))}
-              {messages.filter(msg => msg.sender === 'Mayor Okonjo').length === 0 && (
-                <div className="text-gray-400 italic">No messages yet</div>
-              )}
-            </div>
-            
-            <div className="mt-2 text-xs px-2 py-1 bg-gray-100 rounded-full self-start">
-              MODERATE
-            </div>
-          </div>
-          
-          <div 
-            className={`bg-white rounded-lg shadow-sm p-3 flex flex-col ${
-              activeAgent === 'Community Leader Patel' ? 'ring-2 ring-policy-maroon' : ''
-            }`}
-          >
-            <div className="flex items-center mb-2">
-              <EmotionAvatar
-                agentName="Community Leader Patel"
-                emotion={messages.filter(msg => msg.sender === 'Community Leader Patel').slice(-1)[0]?.emotion as EmotionType || 'neutral'}
-                isActive={activeAgent === 'Community Leader Patel'}
-                size="md"
-                className="mr-2"
-              />
-              <div>
-                <div className="font-medium text-sm">Community Leader Patel</div>
-                <div className="text-xs text-gray-500">Community Advocate</div>
-              </div>
-              <div className="ml-auto flex flex-col items-end gap-1">
-                {activeAgent === 'Community Leader Patel' && (
-                  <div className="flex items-center">
-                    <div className="h-2 w-2 bg-green-500 rounded-full mr-1"></div>
-                    <span className="text-xs text-green-600">Speaking</span>
-                  </div>
-                )}
-                {messages.filter(msg => msg.sender === 'Community Leader Patel').length > 0 && (
-                  <EmotionMeter 
-                    emotion={messages.filter(msg => msg.sender === 'Community Leader Patel').slice(-1)[0]?.emotion as EmotionType || 'neutral'}
-                    size="sm"
-                    showIntensity={true}
-                  />
-                )}
+              
+              <div className="mt-2 text-xs px-2 py-1 bg-gray-100 rounded-full self-start">
+                {agent.stance}
               </div>
             </div>
-            
-            <div className="flex-1 overflow-y-auto text-sm">
-              {messages
-                .filter(msg => msg.sender === 'Community Leader Patel')
-                .slice(-1)
-                .map(msg => (
-                  <div key={msg.id}>
-                    <div className="text-xs text-gray-500 mb-1">
-                      {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </div>
-                    <div>{msg.content}</div>
-                  </div>
-                ))}
-              {messages.filter(msg => msg.sender === 'Community Leader Patel').length === 0 && (
-                <div className="text-gray-400 italic">No messages yet</div>
-              )}
-            </div>
-            
-            <div className="mt-2 text-xs px-2 py-1 bg-gray-100 rounded-full self-start">
-              HUMANITARIAN
-            </div>
-          </div>
+          ))}
           
           {/* Bottom Row - Policy Advisor (You) */}
           <div className="bg-policy-maroon text-white rounded-lg shadow-sm p-3 flex flex-col col-span-4">
@@ -716,20 +456,20 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
               </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto text-sm bg-white bg-opacity-20 rounded p-2">
+            <div className="flex-1 overflow-y-auto text-sm bg-white bg-opacity-20 rounded p-2 text-white">
               {messages
                 .filter(msg => msg.isUser)
                 .slice(-1)
                 .map(msg => (
                   <div key={msg.id}>
-                    <div className="text-xs text-white text-opacity-70 mb-1">
+                    <div className="text-xs text-gray-200 mb-1">
                       {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </div>
-                    <div>{msg.content}</div>
+                    <div className="text-white">{msg.content}</div>
                   </div>
                 ))}
               {messages.filter(msg => msg.isUser).length === 0 && (
-                <div className="text-white text-opacity-70 italic">No messages yet</div>
+                <div className="text-gray-200 italic">No messages yet</div>
               )}
             </div>
           </div>
@@ -756,8 +496,11 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
                     message.isUser 
                       ? 'bg-policy-maroon text-white rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl' 
                       : 'bg-white border rounded-tl-2xl rounded-tr-2xl rounded-br-2xl shadow-sm'
-                  } p-3`}
+                  } p-3 text-black`}
                 >
+                  {!message.isUser && showAgentVoice && (
+                    <VoiceVisualizer isActive={isSpeaking && activeAgent === message.sender} emotion={showEmotion ? (message.emotion as EmotionType) : 'neutral'} />
+                  )}
                   {!message.isUser && (
                     <div className="flex items-center mb-2">
                       <Avatar className="h-6 w-6 mr-2">
@@ -770,7 +513,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
                         <div className="text-xs text-gray-500">{message.isUser ? 'Policy Advisor' : 'Stakeholder'}</div>
                       </div>
                       <div className="ml-auto flex flex-col items-end gap-1">
-                        {message.emotion && message.emotion !== 'neutral' && (
+                        {message.emotion && message.emotion !== 'neutral' && showEmotion && (
                           <EmotionMeter 
                             emotion={message.emotion as EmotionType}
                             size="sm"
@@ -785,7 +528,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
                     <div className="flex items-center mb-2 justify-end">
                       <div className="font-medium text-sm">{message.sender}</div>
                       <div className="ml-auto flex flex-col items-end gap-1">
-                        {message.emotion && message.emotion !== 'neutral' && (
+                        {message.emotion && message.emotion !== 'neutral' && showEmotion && (
                           <EmotionMeter 
                             emotion={message.emotion as EmotionType}
                             size="sm"
@@ -801,7 +544,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
                     </div>
                   )}
                   
-                  <div className="text-sm">
+                  <div className="text-sm text-black">
                     {message.content}
                   </div>
                   
@@ -824,7 +567,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
               placeholder="Type your message here..."
-              className="resize-none border-2 focus:border-policy-maroon"
+              className="resize-none border-2 focus:border-policy-maroon text-black"
               rows={2}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -839,7 +582,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
           </div>
           
           <div className="flex gap-2">
-            {speechSupported && (
+            {speechSupported && showMic && (
               <Button
                 variant={isListening ? "destructive" : "outline"}
                 size="icon"
@@ -848,7 +591,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
                 className="h-10 w-10 rounded-full"
                 title={isListening ? "Stop listening" : "Start voice input"}
               >
-                {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                {isListening ? <MicOff className="h-5 w-5 text-black" /> : <Mic className="h-5 w-5 text-black" />}
               </Button>
             )}
             
@@ -862,25 +605,6 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
               <Send className="h-5 w-5" />
             </Button>
           </div>
-        </div>
-        
-        {/* Policy topics */}
-        <div className="mt-2 flex flex-wrap gap-1">
-          <div className="text-xs text-gray-500 mr-1">Topics:</div>
-          {selectedPolicies.slice(0, 3).map(policy => (
-            <div 
-              key={policy.id} 
-              className="text-xs px-2 py-0.5 bg-gray-100 rounded-full cursor-pointer hover:bg-gray-200"
-              onClick={() => setUserInput(prev => `${prev} Regarding ${policy.title}, `)}
-            >
-              {policy.title}
-            </div>
-          ))}
-          {selectedPolicies.length > 3 && (
-            <div className="text-xs px-2 py-0.5 bg-gray-100 rounded-full">
-              +{selectedPolicies.length - 3} more
-            </div>
-          )}
         </div>
       </div>
     </div>

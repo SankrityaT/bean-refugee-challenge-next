@@ -24,6 +24,7 @@ const EmotionMeter: React.FC<EmotionMeterProps> = ({
   const [intensity, setIntensity] = useState(50);
   const [prevEmotion, setPrevEmotion] = useState<string>(emotion);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [intensityLabel, setIntensityLabel] = useState<string>('');
 
   // Generate a random intensity value when emotion changes
   useEffect(() => {
@@ -35,6 +36,11 @@ const EmotionMeter: React.FC<EmotionMeterProps> = ({
         // Generate a random intensity between 60-95 for more dynamic visualization
         const newIntensity = Math.floor(Math.random() * 35) + 60;
         setIntensity(newIntensity);
+        // Set a qualitative label for the intensity
+        if (newIntensity > 85) setIntensityLabel('Very Strong');
+        else if (newIntensity > 70) setIntensityLabel('Strong');
+        else if (newIntensity > 55) setIntensityLabel('Moderate');
+        else setIntensityLabel('Mild');
         setIsTransitioning(false);
       }, 300);
       
@@ -112,22 +118,20 @@ const EmotionMeter: React.FC<EmotionMeterProps> = ({
   const { icon, color, bgColor, label } = getEmotionData(emotion);
 
   return (
-    <div className={`flex flex-col ${className}`}>
+    <div className={`flex flex-col items-start gap-0.5 ${className}`}>
       <div className={`flex items-center ${getSizeClass('container')} ${bgColor} ${color} rounded-lg transition-all duration-300 ${isTransitioning ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`}>
-        <div className="mr-2">
-          {icon}
-        </div>
-        <span className={`${getSizeClass('text')} font-medium`}>
-          {label}
-        </span>
+        <div className="mr-2">{icon}</div>
+        <span className={`${getSizeClass('text')} font-medium`}>{label}</span>
       </div>
-      
       {showIntensity && (
-        <div className="w-full bg-gray-200 rounded-full mt-1 overflow-hidden">
-          <div 
-            className={`${getSizeClass('meter')} ${color.replace('text', 'bg')} transition-all duration-500 ease-out`}
-            style={{ width: `${intensity}%` }}
-          ></div>
+        <div className="flex items-center w-full mt-1 gap-2">
+          <div className="w-3/4 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              className={`${getSizeClass('meter')} ${color.replace('text', 'bg')} transition-all duration-500 ease-out`}
+              style={{ width: `${intensity}%` }}
+            ></div>
+          </div>
+          <span className="text-xs text-gray-600 font-semibold min-w-[60px]">{intensityLabel}</span>
         </div>
       )}
     </div>

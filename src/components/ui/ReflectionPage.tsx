@@ -124,7 +124,7 @@ const ReflectionPage: React.FC<ReflectionPageProps> = ({
       
       {/* Reflection Questions */}
       <div className="space-y-6">
-        <h3 className="font-bebas text-2xl">Reflection Questions</h3>
+        <h3 className="font-bebas text-2xl">Questions</h3>
         <p className="text-gray-600">
           Use the microphone button or type your responses to the following reflection questions.
           Your responses will be automatically saved when you click the "Save Reflection" button.

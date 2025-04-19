@@ -120,40 +120,43 @@ const StackedPolicyCards: React.FC<StackedPolicyCardsProps> = ({
       </button>
 
       {showAll ? (
-        // Grid view - all cards visible with scrollable container
-        <div className="grid grid-cols-1 gap-6 overflow-y-auto p-4" 
-             style={{ maxHeight: '100%', paddingBottom: '2rem' }}>
+        // Grid view - all cards visible with fixed heights
+        <div className="grid grid-cols-1 gap-4 overflow-y-auto pr-1" style={{ maxHeight: '100%' }}>
           {policies.map((policy, index) => (
-            <div key={policy.id} className="transform transition-all duration-300">
+            <div key={policy.id} className="transform transition-all duration-300 mb-4">
               <div className="relative">
-                {/* Tier badge - moved to top right */}
-                <div className="absolute top-2 right-2 z-20">
-                  <Badge className="bg-primary text-white font-bold">
-                    {policy.tier} {policy.tier === 1 ? 'Unit' : 'Units'}
-                  </Badge>
-                </div>
-                
                 <PolicyCard
                   id={policy.id}
                   title={policy.title}
                   description={policy.description}
                   impact={policy.impact}
                   tier={policy.tier}
-                  cost={policy.cost}
                   icon={areaIcon}
                   category={areaId}
                   isSelected={selectedPolicies.includes(policy.id)}
-                  onClick={() => handleCardClick(index)}
+                  onClick={() => {}}
                 />
-                <div className="absolute bottom-4 right-4 z-10">
+                
+                {/* Units badge - positioned directly on the card */}
+                <div className="absolute top-2 right-2" style={{ zIndex: 50 }}>
+                  <Badge className="bg-primary text-white font-bold">
+                    {policy.tier} {policy.tier === 1 ? 'Unit' : 'Units'}
+                  </Badge>
+                </div>
+                
+                {/* Select button - positioned at the bottom of the card */}
+                <div 
+                  className="absolute bottom-4 right-4" 
+                  style={{ zIndex: 50 }}
+                >
                   <Button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleSelectPolicy(policy.id, policy.tier);
+                      onSelectPolicy(policy.id, policy.tier);
                     }}
-                    className="bg-primary hover:bg-primary/90 text-white"
+                    className="bg-primary hover:bg-primary/90 text-white text-sm px-3 py-1"
                   >
-                    {selectedPolicies.includes(policy.id) ? 'Deselect Policy' : 'Select Policy'}
+                    {selectedPolicies.includes(policy.id) ? 'Deselect' : 'Select Policy'}
                   </Button>
                 </div>
               </div>

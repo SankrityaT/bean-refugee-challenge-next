@@ -71,24 +71,68 @@ export default function PolicySelectionPage() {
     if (selectedPolicies.includes(policyId)) {
       // Policy already selected, remove it
       removeSelectedPolicy(policyId);
-      
-      // Get updated policy objects after removal
-      const updatedPolicyObjects = getSelectedPolicyObjects();
-      
-      // Remove toast notification - we'll only use the persistent budget summary
     } else {
-      // Add new policy
+      // Find which area this policy belongs to
+      let policyArea = null;
+      
+      for (const area of POLICY_AREAS) {
+        const foundPolicy = area.policies.find(p => p.id === policyId);
+        if (foundPolicy) {
+          policyArea = area;
+          break;
+        }
+      }
+      
+      if (policyArea) {
+        // Check if any policy from this area is already selected
+        const existingPolicyFromSameArea = getSelectedPolicyObjects().find(
+          p => policyArea.policies.some(areaPolicy => areaPolicy.id === p.id)
+        );
+        
+        if (existingPolicyFromSameArea) {
+          // Remove the existing policy from this area first
+          removeSelectedPolicy(existingPolicyFromSameArea.id);
+          toast({
+            title: "Policy Replaced",
+            description: `Previous policy from ${policyArea.title} has been replaced.`,
+          });
+        }
+      }
+      
+      // Add the new policy
       addSelectedPolicy(policyId);
-      
-      // Get updated policy objects after adding
-      const updatedPolicyObjects = getSelectedPolicyObjects();
-      
-      // Remove all toast notifications - we'll only use the persistent budget summary
     }
   };
   
   const handleContinue = () => {
     if (budgetValidation.isValid) {
+      // Get selected policy objects
+      const selectedPolicyObjects = getSelectedPolicyObjects();
+      const totalUnits = selectedPolicyObjects.reduce((sum, policy) => sum + policy.tier, 0);
+      
+      // Check if at least 8 units are allocated
+      if (totalUnits < 8) {
+        toast({
+          title: "Cannot Proceed",
+          description: "You must allocate at least 8 budget units before continuing.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Check if there's a mix of tier levels (at least one tier 1 and one tier 2 or higher)
+      const hasTier1 = selectedPolicyObjects.some(policy => policy.tier === 1);
+      const hasHigherTier = selectedPolicyObjects.some(policy => policy.tier > 1);
+      
+      if (!hasTier1 || !hasHigherTier) {
+        toast({
+          title: "Cannot Proceed",
+          description: "You must select a mix of tier levels (at least one Tier 1 and one higher tier policy).",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       router.push('/stakeholder-negotiation');
     } else {
       toast({

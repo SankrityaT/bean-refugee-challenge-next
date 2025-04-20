@@ -22,8 +22,11 @@ export async function POST(request: NextRequest) {
     console.log('Generating PDF...');
     
     try {
+      // Extract policies and reflections from the data
+      const { policies = [], reflections = [] } = pdfData;
+      
       // Generate PDF buffer using our helper function
-      const pdfBuffer = await generatePdfBuffer(pdfData);
+      const pdfBuffer = await generatePdfBuffer(policies, reflections);
       console.log('PDF generated successfully');
       
       // Convert buffer to base64

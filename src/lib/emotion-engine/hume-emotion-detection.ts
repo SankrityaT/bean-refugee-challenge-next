@@ -8,8 +8,10 @@ import { EmotionType } from '@/lib/ai-negotiation/shared-types';
 export const detectEmotionsWithHume = async (text: string): Promise<string> => {
   try {
     // Call our Python server's emotion detection endpoint
-    // Use IPv4 address explicitly to avoid IPv6 connection issues
-    const humeResponse = await fetch('http://127.0.0.1:5001/api/emotion', {
+    // Use environment variable for API URL or fallback to localhost for development
+    const apiBaseUrl = process.env.NEXT_PUBLIC_HUME_API_SERVER_URL || 'http://127.0.0.1:5001';
+    
+    const humeResponse = await fetch(`${apiBaseUrl}/api/emotion`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

@@ -552,4 +552,8 @@ def detect_emotion_from_audio():
         }), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    # Get port from environment variable for production environments
+    port = int(os.environ.get('PORT', 5001))
+    # Set debug to False in production
+    debug = os.environ.get('FLASK_ENV', 'production') != 'production'
+    app.run(host='0.0.0.0', port=port, debug=debug)

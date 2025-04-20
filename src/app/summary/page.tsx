@@ -8,7 +8,7 @@ import { useGameContext } from '@/context/GameContext';
 import { Badge } from '@/components/ui/badge';
 import { Download, ArrowLeft, Home, Mail, ExternalLink } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 
 export default function SummaryPage() {
   const router = useRouter();
@@ -24,10 +24,10 @@ export default function SummaryPage() {
   const [pdfFilename, setPdfFilename] = useState('challenge-policy-summary.pdf');
   
   // Helper: Consolidate negotiation summary per agent
-  function getNegotiationSummary(logs) {
+  function getNegotiationSummary(logs: any[]) {
     if (!logs || logs.length === 0) return [];
     // Group logs by agent (exclude user messages)
-    const agentMap = {};
+    const agentMap: Record<string, string[]> = {};
     logs.forEach(log => {
       if (!log.isUser) {
         if (!agentMap[log.agent]) agentMap[log.agent] = [];

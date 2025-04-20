@@ -133,11 +133,10 @@ const ReflectionPage: React.FC<ReflectionPageProps> = ({
         {localReflectionData.questions.map((question) => (
           <ReflectionPrompt 
             key={question.id}
-            question={question.question}
-            category={question.category}
-            questionId={question.id}
-            savedResponse={localReflectionData.responses[question.id] || ''}
-            onSave={handleSaveReflection}
+            question={question}
+            initialResponse={localReflectionData.responses[question.id] || ''}
+            onSave={(response) => handleSaveReflection(question.id, response)}
+            selectedPolicies={[]}
           />
         ))}
       </div>

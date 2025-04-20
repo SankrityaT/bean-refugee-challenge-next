@@ -64,7 +64,10 @@ export const speakWithEmotion = async (
       // Make request to our Flask API server for TTS
       console.log(`Generating speech for: ${text.substring(0, 50)}... with emotion: ${emotion}`);
       
-      const response = await fetch('http://localhost:5001/api/tts', {
+      // Use environment variable for API URL or fallback to localhost for development
+      const apiBaseUrl = process.env.NEXT_PUBLIC_HUME_API_SERVER_URL || 'http://localhost:5001';
+      
+      const response = await fetch(`${apiBaseUrl}/api/tts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

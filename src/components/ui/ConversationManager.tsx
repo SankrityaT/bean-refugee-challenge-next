@@ -601,6 +601,15 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
   const handleSubmit = async () => {
     if (!userInput.trim()) return;
     
+    // Detect emotion for Policy Advisor message but don't disrupt existing flow
+    let userMessageEmotion = 'neutral';
+    try {
+      userMessageEmotion = await detectEmotionsWithHume(userInput);
+      console.log(`Policy Advisor emotion detected: ${userMessageEmotion}`);
+    } catch (error) {
+      console.error('Error detecting Policy Advisor emotion:', error);
+    }
+    
     // Create a new message object
     const newMessage: Message = {
       id: uuidv4(),
@@ -609,7 +618,8 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
       timestamp: new Date(),
       isUser: true,
       respondingTo: lastAgent,
-      policyAreaId: currentPolicyArea?.id
+      policyAreaId: currentPolicyArea?.id,
+      emotion: userMessageEmotion // Add the detected emotion
     };
     
     // Add the message to the conversation
@@ -633,10 +643,25 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
           message: userInput,
           isUser: true,
           timestamp: new Date(),
-          emotion: 'neutral'
+          emotion: userMessageEmotion // Use the detected emotion
         }
       ];
       onConversationUpdate(updatedLogs);
+    }
+    
+    // Add to policy negotiation history if in policy-specific mode
+    if (policySpecificMode && currentPolicyArea && addPolicyNegotiationLog) {
+      setTimeout(() => {
+        addPolicyNegotiationLog({
+          agent: 'Policy Advisor', // Always use 'Policy Advisor' for user messages
+          content: userInput,
+          timestamp: new Date().toISOString(),
+          emotion: userMessageEmotion, // Use the detected emotion
+          isUser: true,
+          policyAreaId: currentPolicyArea.id,
+          id: newMessage.id // Include the message ID for proper tracking
+        });
+      }, 0);
     }
     
     // Generate agent response - but make sure it's not the same agent who just spoke
@@ -748,7 +773,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
       <div className="border-t bg-white">
         <div className="p-2 flex justify-between items-center cursor-pointer hover:bg-gray-50" 
              onClick={() => setShowFullHistory(prev => !prev)}>
-          <span className="text-sm font-medium">Full Conversation History</span>
+          <span className="text-sm font-medium">Current Policy Conversation History</span>
           <ChevronDown className={`h-4 w-4 transform ${showFullHistory ? 'rotate-180' : ''}`} />
         </div>
         
@@ -812,7 +837,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
                     </div>
                   )}
                   
-                  <div className="text-sm text-black">
+                  <div className={`text-sm ${message.isUser ? 'text-white' : 'text-black'}`}>
                     {message.content}
                   </div>
                   

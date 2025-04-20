@@ -65,7 +65,7 @@ export const speakWithEmotion = async (
       console.log(`Generating speech for: ${text.substring(0, 50)}... with emotion: ${emotion}`);
       
       // Use environment variable for API URL or fallback to localhost for development
-      const apiBaseUrl = process.env.NEXT_PUBLIC_HUME_API_SERVER_URL || 'http://localhost:5001';
+      const apiBaseUrl = process.env.NEXT_PUBLIC_HUME_TTS_SERVER_URL || 'http://localhost:5001';
       
       const response = await fetch(`${apiBaseUrl}/api/tts`, {
         method: 'POST',

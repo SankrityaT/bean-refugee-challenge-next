@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { validateSelections, calculateRemainingUnits } from '@/lib/budget-engine';
 import { generateReflection, saveReflectionResponse } from '@/lib/reflection-engine';
-import { PolicyWithArea } from '@/lib/ai-negotiation/shared-types'; // Fix the import path
+import { PolicyWithArea } from '@/lib/ai-negotiation/shared-types';
 import { POLICY_AREAS } from '@/data/game-data';
 
 type GamePhase = 'onboarding' | 'policy-selection' | 'stakeholder-negotiation' | 'ethical-reflection';
@@ -20,6 +20,8 @@ export interface NegotiationLog {
   timestamp: string;
   emotion?: string;
   isUser?: boolean;
+  policyAreaId?: string; // Add policy area ID to track which policy this log belongs to
+  id?: string; // Add unique ID for each message
 }
 
 // Add to your GameContextType interface
@@ -120,6 +122,106 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       };
       setReflectionData(updatedReflectionData);
     }
+  };
+
+  // New state for policy-by-policy negotiation
+  const [currentPolicyIndex, setCurrentPolicyIndex] = useState<number>(0);
+  const [policyOrder, setPolicyOrder] = useState<string[]>([]);
+  const [policyNegotiationHistory, setPolicyNegotiationHistory] = useState<Record<string, NegotiationLog[]>>({});
+  
+  // Initialize policy order when selected policies change
+  useEffect(() => {
+    if (selectedPolicies.length > 0 && policyOrder.length === 0) {
+      // Create an array of policy area IDs from the selected policies
+      const selectedPolicyObjects = getSelectedPolicyObjects();
+      const policyAreas = new Set<string>();
+      
+      // Get unique policy areas
+      selectedPolicyObjects.forEach(policy => {
+        const policyArea = POLICY_AREAS.find(area => 
+          area.policies.some(p => p.id === policy.id)
+        );
+        if (policyArea) {
+          policyAreas.add(policyArea.id);
+        }
+      });
+      
+      // Convert to array and set policy order
+      const areas = Array.from(policyAreas);
+      setPolicyOrder(areas);
+      
+      // Initialize empty history for each area
+      const initialHistory: Record<string, NegotiationLog[]> = {};
+      areas.forEach(area => {
+        initialHistory[area] = [];
+      });
+      setPolicyNegotiationHistory(initialHistory);
+    }
+  }, [selectedPolicies]);
+  
+  // New methods for policy-by-policy negotiation
+  const goToNextPolicy = () => {
+    if (currentPolicyIndex < policyOrder.length - 1) {
+      setCurrentPolicyIndex(currentPolicyIndex + 1);
+      return true;
+    }
+    return false;
+  };
+  
+  const goToPreviousPolicy = () => {
+    if (currentPolicyIndex > 0) {
+      setCurrentPolicyIndex(currentPolicyIndex - 1);
+      return true;
+    }
+    return false;
+  };
+  
+  const getCurrentPolicy = () => {
+    if (policyOrder.length === 0 || currentPolicyIndex >= policyOrder.length) {
+      return null;
+    }
+    
+    const currentPolicyAreaId = policyOrder[currentPolicyIndex];
+    const policyArea = POLICY_AREAS.find(area => area.id === currentPolicyAreaId);
+    
+    if (!policyArea) {
+      return null;
+    }
+    
+    // Find the selected policy for this area
+    const selectedPolicyObjects = getSelectedPolicyObjects();
+    const selectedPolicy = selectedPolicyObjects.find(policy => {
+      const area = POLICY_AREAS.find(a => a.policies.some(p => p.id === policy.id));
+      return area?.id === currentPolicyAreaId;
+    });
+    
+    if (!selectedPolicy) {
+      return null;
+    }
+    
+    return {
+      id: policyArea.id,
+      title: policyArea.title,
+      description: policyArea.description,
+      selectedPolicy: selectedPolicy as PolicyWithArea
+    };
+  };
+  
+  const getPolicyNegotiationLogs = (policyId: string) => {
+    return policyNegotiationHistory[policyId] || [];
+  };
+  
+  const addPolicyNegotiationLog = (policyId: string, log: NegotiationLog) => {
+    setPolicyNegotiationHistory(prev => {
+      const updatedLogs = [...(prev[policyId] || []), log];
+      return {
+        ...prev,
+        [policyId]: updatedLogs
+      };
+    });
+    
+    // Also add to the general negotiation logs for backward compatibility
+    addNegotiationLog(log);
   };
 
   const contextValue = {

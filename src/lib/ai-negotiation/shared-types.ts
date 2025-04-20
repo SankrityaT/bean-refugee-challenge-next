@@ -13,6 +13,13 @@ export interface PolicyWithArea {
 export type EmotionType = string;
 export type SentimentType = 'positive' | 'neutral' | 'negative';
 
+// Add policy area context type
+export interface PolicyAreaContext {
+  id: string;
+  title: string;
+  description: string;
+}
+
 export interface GroqRequestParams {
   agentName: string;
   agentStance: AgentStance;
@@ -22,4 +29,5 @@ export interface GroqRequestParams {
   mustRespondToUser?: boolean;
   temperature?: number;
   max_tokens?: number;
+  policyAreaContext?: PolicyAreaContext; // Add policy area context
 }

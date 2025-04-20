@@ -7,7 +7,17 @@ import { PolicyWithArea, SentimentType, GroqRequestParams } from './shared-types
  * @returns Generated response text
  */
 export const generateGroqResponse = async (params: GroqRequestParams): Promise<string> => {
-  const { agentName, agentStance, selectedPolicies, sentiment, conversationContext, mustRespondToUser } = params;
+  const { 
+    agentName, 
+    agentStance, 
+    selectedPolicies, 
+    sentiment, 
+    conversationContext = '',
+    mustRespondToUser = false,
+    temperature = 0.7,
+    max_tokens = 500,
+    policyAreaContext // New parameter
+  } = params;
   
   // Create a prompt for the Groq API
   const prompt = createGroqPrompt(agentName, agentStance, selectedPolicies, sentiment, conversationContext, mustRespondToUser);

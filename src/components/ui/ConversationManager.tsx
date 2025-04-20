@@ -113,17 +113,14 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
     
     // Only run this effect when the policy area changes or on initial mount
     if (policySpecificMode && currentPolicyArea && addPolicyNegotiationLog) {
-      // Load ALL messages to preserve full conversation history
-      // We'll display all messages but only focus on the current policy for agent responses
-      const allMessages = getPolicyNegotiationLogs || [];
+      // Load policy-specific messages
+      const policyMessages = getPolicyNegotiationLogs 
+        ? getPolicyNegotiationLogs.filter(log => log.policyAreaId === currentPolicyArea.id)
+        : [];
       
-      // Check if there are already messages for this specific policy
-      const hasPolicyMessages = allMessages.some(log => log.policyAreaId === currentPolicyArea.id);
-      
-      if (allMessages.length > 0) {
+      if (policyMessages.length > 0) {
         // Use functional update to avoid dependency on messages
-        // Convert all logs to Message format
-        setMessages(allMessages.map(log => ({
+        setMessages(policyMessages.map(log => ({
           id: log.id || uuidv4(),
           sender: log.agent,
           content: log.content,
@@ -132,10 +129,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
           isUser: log.isUser,
           policyAreaId: log.policyAreaId
         })));
-      }
-      
-      // If there are no messages for this specific policy, initialize with a welcome message
-      if (!hasPolicyMessages && !conversationStarted.current) {
+      } else if (!conversationStarted.current) {
         // Initialize with welcome message for this policy area
         const initialMessage: Message = {
           id: uuidv4(),
@@ -147,8 +141,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
           policyAreaId: currentPolicyArea.id
         };
         
-        // Add the initial message to the existing messages
-        setMessages(prev => [...prev, initialMessage]);
+        setMessages([initialMessage]);
         
         // Add to policy negotiation history - use setTimeout to break potential circular dependencies
         setTimeout(() => {
@@ -594,7 +587,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
                 />
                 <div>
                   <div className="font-medium text-sm">{agent.name}</div>
-                  {/* Removed role designation as requested */}
+                  <div className="text-xs text-gray-500">{agent.role || 'Stakeholder'}</div>
                 </div>
                 <div className="ml-auto flex flex-col items-end gap-1">
                   {activeAgent === agent.name && (
@@ -642,7 +635,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
               </div>
               <div>
                 <div className="font-medium">{userTitle}</div>
-                {/* Removed role designation as requested */}
+                <div className="text-xs text-white text-opacity-80">Ministry of Refugee Affairs</div>
               </div>
               <div className="ml-auto flex flex-col items-end gap-1">
                 {isListening && (

@@ -309,8 +309,10 @@ const ReflectionPrompt: React.FC<ReflectionPromptProps> = ({
         />
         
         {isRecording && (
-          <div className="mt-2">
-            <VoiceVisualizer data={audioVisualizerData} />
+          <div className="mt-2 flex flex-col items-center">
+            {/* VoiceVisualizer with animation while recording */}
+            <VoiceVisualizer isActive={true} data={audioVisualizerData} />
+            <div className="text-xs text-hope-turquoise mt-1 animate-pulse">Listening...</div>
           </div>
         )}
         

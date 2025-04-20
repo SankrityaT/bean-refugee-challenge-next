@@ -194,7 +194,7 @@ function getFallbackFeedback(qualityAnalysis: { isQualityResponse: boolean; reas
     // Provide constructive feedback for low-quality responses
     switch(qualityAnalysis.reason) {
       case 'too short':
-        return "Your response is quite brief. Consider expanding on your thoughts and connecting them to the ethical implications of your policy choices.";
+        return "Your response is quite brief. Consider expanding on your thoughts and connecting them to the implications of your policy choices.";
       case 'random characters':
         return "I notice your response contains unusual text. Please provide a thoughtful reflection on the ethical dimensions of your policy decisions.";
       case 'repetitive content':

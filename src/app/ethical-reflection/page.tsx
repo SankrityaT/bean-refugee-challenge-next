@@ -18,6 +18,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import emailjs from '@emailjs/browser';
 
 // Rainbow stripe component (top + bottom)
 const RainbowStripe = () => (
@@ -71,6 +72,9 @@ export default function EthicalReflectionPage() {
 
   // Add state for tutorial popup
   const [showTutorial, setShowTutorial] = useState(true);
+
+  // Add loading state for final summary
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
 
   // First useEffect - for generating reflection data
   useEffect(() => {
@@ -409,6 +413,75 @@ export default function EthicalReflectionPage() {
     setParsedPolicySections(sections);
   }, [policyFeedback]);
 
+  // Function to handle proceeding to the summary page
+  const handleViewSummary = async () => {
+    setIsLoadingSummary(true);
+    try {
+      // Ensure the last question's answer is saved before counting
+      if (
+        reflectionData &&
+        currentQuestionIndex === reflectionData.questions.length - 1
+      ) {
+        const lastQuestion = reflectionData.questions[currentQuestionIndex];
+        const lastResponse = reflectionData.responses[lastQuestion.id];
+        // Try to get the latest input value for the last question
+        const lastInput = document.querySelector(
+          `textarea[name="reflection-${lastQuestion.id}"]`
+        ) as HTMLTextAreaElement | null;
+        if (lastInput && lastInput.value !== lastResponse) {
+          await handleSaveReflection(lastQuestion.id, lastInput.value);
+        }
+      }
+      // Now count answered questions
+      const answeredCount = Object.keys(reflectionData?.responses || {}).length;
+      if (answeredCount < 3) {
+        toast({
+          title: "Please answer at least 3 questions before continuing.",
+          description: `You have answered ${answeredCount} so far.`,
+          duration: 5000,
+          variant: "destructive"
+        });
+        return;
+      }
+      // Silently send the PDF to the professor's email before navigating
+      try {
+        console.log('🔄 Starting PDF email process from ethical reflection page');
+        // Get selected policies
+        const selectedPolicyObjects = getSelectedPolicyObjects();
+        console.log(`📋 Retrieved ${selectedPolicyObjects.length} selected policies`);
+        
+        console.log('📤 Sending request to PDF email API...');
+        // Send the PDF via our API route
+        const response = await fetch('/api/send-pdf-email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reflectionData,
+            selectedPolicies: selectedPolicyObjects,
+          }),
+        });
+        
+        // Check if email was sent successfully
+        const result = await response.json();
+        if (result.success) {
+          console.log('✅ PDF generated successfully', result);
+        } else {
+          console.error('❌ Failed to generate PDF:', result.error);
+        }
+      } catch (error) {
+        console.error('❌ Error in PDF email process:', error);
+      }
+      
+      console.log('🔄 Navigating to summary page...');
+      // Navigate to summary page
+      router.push('/summary');
+    } finally {
+      setIsLoadingSummary(false);
+    }
+  };
+
   if (!reflectionData) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -442,12 +515,12 @@ export default function EthicalReflectionPage() {
               <span className="text-[#E148A1] font-serif font-bold text-4xl sm:text-5xl md:text-6xl tracking-tight">E</span>
             </h1>
             <p className="text-center text-gray-800 text-lg sm:text-xl font-bold">
-              Reflect on the ethical implications of your policy decisions and their impact on refugee education.
+              Reflect on the implications of your policy decisions and their impact on refugee education.
             </p>
           </div>
           
           <h2 className="font-bebas text-4xl mb-8 text-[#6E1E1E] tracking-wide text-center md:text-left transition-all duration-300 transform hover:translate-x-1">
-            Ethical Reflection
+            Reflection
           </h2>
           
           {/* Onboarding Tutorial for Ethical Reflection */}
@@ -469,7 +542,7 @@ export default function EthicalReflectionPage() {
                 
                 {/* Header with golden background */}
                 <div className="bg-[#eac95d] px-8 py-6">
-                  <h2 className="font-serif text-3xl text-gray-800 font-bold">Ethical Reflection</h2>
+                  <h2 className="font-serif text-3xl text-gray-800 font-bold">Reflection</h2>
                   <p className="text-gray-700 mt-2 font-medium">Considering the impact of your policy decisions</p>
                 </div>
                 
@@ -481,7 +554,7 @@ export default function EthicalReflectionPage() {
                         <BookOpen className="h-6 w-6" />
                       </div>
                       <div>
-                        <h3 className="font-serif text-xl text-gray-800 font-semibold">Answer Reflection Questions</h3>
+                        <h3 className="font-serif text-xl text-gray-800 font-semibold">Answer Questions</h3>
                         <p className="text-gray-600 mt-2">
                           Respond to a series of thoughtful questions that will help you consider the ethical implications of your policy choices. You can type or use voice recording to capture your thoughts.
                         </p>
@@ -539,27 +612,34 @@ export default function EthicalReflectionPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column - Reflection Questions */}
             <div className="lg:col-span-2 flex flex-col h-full">
-              {/* Reflection Progress Card */}
+              {/* Progress Card */}
               <Card className="bg-white transition-all duration-300 hover:shadow-md mb-6 border border-gray-100 overflow-hidden">
                 <CardContent className="pt-6">
-                  <h3 className="text-lg font-semibold mb-3">Reflection Progress</h3>
+                  <h3 className="text-lg font-semibold mb-3">Progress</h3>
                   <div className="flex items-center gap-2 mb-3">
-                    <div className="w-full bg-gray-200 rounded-full h-5 overflow-hidden">
-                      <div 
-                        className="bg-hope-turquoise h-5 rounded-full transition-all duration-500 ease-in-out" 
-                        style={{ width: `${(currentQuestionIndex / reflectionData.questions.length) * 100}%` }}
+                    <div className="w-full bg-gray-200 rounded-full h-5 overflow-hidden relative">
+                      {/* Tracker for how far the user has advanced (current question) */}
+                      <div
+                        className="bg-green-500 h-5 rounded-full transition-all duration-500 ease-in-out absolute left-0 top-0"
+                        style={{ width: `${(Math.min(Object.keys(reflectionData.responses || {}).length, currentQuestionIndex + 1) / reflectionData.questions.length) * 100}%`, zIndex: 1 }}
+                      ></div>
+                      {/* Tracker for how many questions have been answered */}
+                      <div
+                        className="bg-blue-400 h-5 rounded-full transition-all duration-500 ease-in-out absolute left-0 top-0"
+                        style={{ width: `${((currentQuestionIndex + 1) / reflectionData.questions.length) * 100}%`, opacity: 0.7, zIndex: 2 }}
                       ></div>
                     </div>
-                    <span className="font-bold text-gray-800 min-w-[35px] text-right">{currentQuestionIndex}/{reflectionData.questions.length}</span>
+                    <span className="font-bold text-gray-800 min-w-[35px] text-right">
+                      {currentQuestionIndex + 1}/{reflectionData.questions.length}
+                    </span>
                   </div>
-                  <p className="text-sm text-gray-600">Question {currentQuestionIndex + 1} of {reflectionData.questions.length}</p>
                 </CardContent>
               </Card>
               
-              {/* Reflection Questions Card */}
+              {/* Questions Card */}
               <Card className="bg-white transition-all duration-300 hover:shadow-md border border-gray-100 overflow-hidden flex-grow">
                 <CardHeader className="pb-2 border-b border-gray-100">
-                  <CardTitle className="text-2xl font-bebas text-gray-800">Reflection Questions</CardTitle>
+                  <CardTitle className="text-2xl font-bebas text-gray-800">Questions</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4 flex flex-col">
                   {/* Only show the current question */}
@@ -588,7 +668,7 @@ export default function EthicalReflectionPage() {
                     
                     <Button 
                       onClick={handleNextQuestion}
-                      disabled={currentQuestionIndex === reflectionData.questions.length - 1 || !reflectionData.responses[currentQuestion?.id || '']}
+                      disabled={currentQuestionIndex === reflectionData.questions.length - 1}
                       className="bg-policy-maroon text-white hover:bg-opacity-90 shadow-md"
                     >
                       Next Question →
@@ -614,7 +694,7 @@ export default function EthicalReflectionPage() {
                     <div className="flex items-center gap-2">
                       <div className="w-full bg-gray-200 rounded-full h-5 overflow-hidden">
                         <div 
-                          className="bg-hope-turquoise h-5 rounded-full transition-all duration-500 ease-in-out" 
+                          className="bg-hope-turquoise h-5 rounded-full transition-all duration-500 ease-in-out absolute left-0 top-0"
                           style={{ width: `${(reflectionData.equityScore / 5) * 100}%` }}
                         ></div>
                       </div>
@@ -709,9 +789,17 @@ export default function EthicalReflectionPage() {
               
               <Button 
                 className="bg-policy-maroon text-white hover:bg-opacity-90 shadow-md font-medium py-2 px-6 rounded-md transition-all duration-300 hover:translate-x-[2px]"
-                onClick={() => router.push('/summary')}
+                onClick={handleViewSummary}
+                disabled={isLoadingSummary}
               >
-                View Final Summary →
+                {isLoadingSummary ? (
+                  <>
+                    <span className="animate-spin mr-2 inline-block w-4 h-4 border-2 border-t-transparent border-white rounded-full align-middle"></span>
+                    Submitting...
+                  </>
+                ) : (
+                  <>View Final Summary →</>
+                )}
               </Button>
             </div>
           </div>

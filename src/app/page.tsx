@@ -75,7 +75,7 @@ export default function Home() {
               <BentoGridItem
                 title="Budget Constraints"
                 description="Balance resources effectively with a 14 units budget while addressing diverse educational needs."
-                header={<ImageHeader src="/budgetConstraints.jpg" alt="Budget Constraints" />}
+                header={<ImageHeader src="/budgetConstraintsWomen.jpg" alt="Budget Constraints" />}
               />
               <BentoGridItem
                 title="Stakeholder Engagement"
@@ -85,9 +85,9 @@ export default function Home() {
               
               {/* Second row - 3 equal cards */}
               <BentoGridItem
-                title="Ethical Dilemmas"
+                title="Dilemmas"
                 description="Confront moral dilemmas and social tensions inherent in refugee education policy."
-                header={<ImageHeader src="/ethicalDilemmas.jpg" alt="Ethical Dilemmas" />}
+                header={<ImageHeader src="/dilemmasWomen.jpg" alt="Ethical Dilemmas" />}
               />
               <BentoGridItem
                 title="Republic of Bean"
@@ -95,9 +95,9 @@ export default function Home() {
                 header={<ImageHeader src="/republicOfBean.jpg" alt="Republic of Bean" />}
               />
               <BentoGridItem
-                title="Critical Reflection"
+                title="Reflection"
                 description="Reflect on your decisions and their implications for equity, justice, and inclusion."
-                header={<ImageHeader src="/criticalReflection.jpg" alt="Critical Reflection" />}
+                header={<ImageHeader src="/womenCriticalReflection.jpg" alt="Critical Reflection" />}
               />
             </div>
           </div>

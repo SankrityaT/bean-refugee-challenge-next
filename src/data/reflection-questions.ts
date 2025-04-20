@@ -8,7 +8,7 @@ export const REFLECTION_QUESTIONS: ReflectionQuestion[] = [
   {
     id: 'r1',
     question: 'Whose interests did your decisions ultimately serve, and whose interests were marginalized?',
-    category: 'Ethical Analysis'
+    category: 'Analysis'
   },
   {
     id: 'r2',
@@ -23,7 +23,7 @@ export const REFLECTION_QUESTIONS: ReflectionQuestion[] = [
   {
     id: 'r4',
     question: 'What assumptions about refugees and education were challenged or reinforced through your decisions?',
-    category: 'Critical Reflection'
+    category: 'Reflection'
   },
   {
     id: 'r5',

@@ -19,6 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import emailjs from '@emailjs/browser';
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 // Rainbow stripe component (top + bottom)
 const RainbowStripe = () => (
@@ -51,7 +52,8 @@ export default function EthicalReflectionPage() {
     setReflectionData,
     saveReflection,
     aiFeedback,
-    setAiFeedback
+    setAiFeedback,
+    selectedPolicies
   } = useGameContext();
 
   // All hooks at the top!
@@ -78,12 +80,10 @@ export default function EthicalReflectionPage() {
 
   // First useEffect - for generating reflection data
   useEffect(() => {
-    if (!reflectionData) {
-      const selectedPolicyObjects = getSelectedPolicyObjects();
-      const reflection = generateReflection(selectedPolicyObjects);
-      setReflectionData(reflection);
-    }
-  }, []);
+    const selectedPolicyObjects = getSelectedPolicyObjects();
+    const reflection = generateReflection(selectedPolicyObjects);
+    setReflectionData(reflection);
+  }, [selectedPolicies]);
 
   // Second useEffect - for generating feedback
   // MOVE THIS BEFORE ANY CONDITIONAL RETURNS
@@ -690,13 +690,48 @@ export default function EthicalReflectionPage() {
                 </CardHeader>
                 <CardContent className="pt-4 flex flex-col flex-grow">
                   <div className="mb-6">
-                    <h3 className="text-xl font-semibold mb-3">Equity Score</h3>
+                    <h3 className="text-xl font-semibold mb-3 flex items-center gap-1">
+                      Equity Score
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" aria-label="Equity Score Info" className="ml-1 text-gray-500 hover:text-blue-600 focus:outline-none">
+                              {/* Visible "i" icon with filled background for contrast */}
+                              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 border border-blue-300">
+                                <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true" className="text-blue-600 font-bold">
+                                  <circle cx="12" cy="12" r="11" stroke="currentColor" strokeWidth="2" fill="white" />
+                                  <text x="12" y="17" textAnchor="middle" fontSize="13" fontWeight="bold" fill="currentColor">i</text>
+                                </svg>
+                              </span>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs text-gray-900 p-3">
+                            <div className="font-semibold mb-1">Equity Score Rubric</div>
+                            <ul className="mb-2 text-sm">
+                              <li><span className="font-bold text-green-600">4.0–5.0:</span> Strong equity & inclusion</li>
+                              <li><span className="font-bold text-yellow-500">2.5–3.9:</span> Moderate alignment</li>
+                              <li><span className="font-bold text-red-500">0–2.4:</span> Limited equity impact</li>
+                            </ul>
+                            <div className="text-xs text-gray-700">
+                              Based on UNESCO metrics. Your current score: <span className="font-bold">{reflectionData.equityScore}/5</span>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </h3>
                     <div className="flex items-center gap-2">
-                      <div className="w-full bg-gray-200 rounded-full h-5 overflow-hidden">
-                        <div 
-                          className="bg-hope-turquoise h-5 rounded-full transition-all duration-500 ease-in-out absolute left-0 top-0"
-                          style={{ width: `${(reflectionData.equityScore / 5) * 100}%` }}
+                      <div className="w-full bg-gray-200 rounded-full h-5 overflow-hidden relative">
+                        {/* Colored bar based on equity score */}
+                        <div
+                          className={`h-5 rounded-full transition-all duration-500 ease-in-out absolute left-0 top-0 ${
+                            reflectionData.equityScore >= 4 ? 'bg-green-500' :
+                            reflectionData.equityScore >= 2.5 ? 'bg-yellow-400' :
+                            'bg-red-400'
+                          }`}
+                          style={{ width: `${(reflectionData.equityScore / 5) * 100}%`, zIndex: 2 }}
                         ></div>
+                        {/* Gray background bar for contrast */}
+                        <div className="absolute left-0 top-0 w-full h-5 bg-gray-200 rounded-full" style={{ zIndex: 1 }}></div>
                       </div>
                       <span className="font-bold text-gray-800 min-w-[35px] text-right">{reflectionData.equityScore}/5</span>
                     </div>

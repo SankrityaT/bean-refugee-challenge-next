@@ -110,6 +110,14 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     setBudgetValidation(validation);
   }, [selectedPolicies]);
 
+  // Automatically update reflection data (including equity score) when selected policies change
+  useEffect(() => {
+    // Only generate new reflection data if it doesn't exist yet (preserve responses)
+    if (!reflectionData) {
+      generateReflectionData();
+    }
+  }, [selectedPolicies]);
+
   // Add the saveReflection implementation
   const saveReflection = (questionId: string, response: string) => {
     if (reflectionData) {
@@ -223,6 +231,20 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     // Also add to the general negotiation logs for backward compatibility
     addNegotiationLog(log);
   };
+
+  // --- Add localStorage persistence for selectedPolicies ---
+  // Load selectedPolicies from localStorage on mount
+  useEffect(() => {
+    const savedPolicies = localStorage.getItem('selectedPolicies');
+    if (savedPolicies) {
+      setSelectedPolicies(JSON.parse(savedPolicies));
+    }
+  }, []);
+
+  // Save selectedPolicies to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('selectedPolicies', JSON.stringify(selectedPolicies));
+  }, [selectedPolicies]);
 
   const contextValue = {
     selectedPolicies,

@@ -78,9 +78,9 @@ export default function Home() {
                 header={<ImageHeader src="/budgetConstraintsWomen.jpg" alt="Budget Constraints" />}
               />
               <BentoGridItem
-                title="Stakeholder Engagement"
-                description="Negotiate with different stakeholders to build consensus for your policy choices."
-                header={<ImageHeader src="/stakeholder.jpg" alt="Stakeholder Engagement" />}
+                title="Assembly Members"
+                description="Negotiate with different assembly members to build consensus for your policy choices."
+                header={<ImageHeader src="/assemblyMembers.jpg" alt="Assembly Members" />}
               />
               
               {/* Second row - 3 equal cards */}

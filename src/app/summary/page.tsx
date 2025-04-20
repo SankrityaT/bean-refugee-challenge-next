@@ -9,22 +9,58 @@ import { Badge } from '@/components/ui/badge';
 import { Download, ArrowLeft, Home, Mail, ExternalLink } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { toast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
 
 export default function SummaryPage() {
   const router = useRouter();
   const { 
     getSelectedPolicyObjects,
     reflectionData,
-    aiFeedback,
     negotiationLogs
   } = useGameContext();
   
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [pdfGenerated, setPdfGenerated] = useState(false);
   const [pdfFilename, setPdfFilename] = useState('challenge-policy-summary.pdf');
+  const [negotiationSummary, setNegotiationSummary] = useState<string>('');
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   
-  // Helper: Consolidate negotiation summary per agent
-  function getNegotiationSummary(logs: any[]) {
+  // Generate AI summary of negotiation logs
+  useEffect(() => {
+    if (negotiationLogs && negotiationLogs.length > 0) {
+      generateNegotiationSummary();
+    }
+  }, [negotiationLogs]);
+  
+  // Function to call the API and get the AI-generated summary
+  const generateNegotiationSummary = async () => {
+    setIsLoadingSummary(true);
+    try {
+      const response = await fetch('/api/generate-negotiation-summary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ negotiationLogs }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate summary');
+      }
+      
+      const data = await response.json();
+      setNegotiationSummary(data.summary);
+    } catch (error) {
+      console.error('Error generating negotiation summary:', error);
+      // Fallback to simple summary if AI generation fails
+      setNegotiationSummary('Summary of stakeholder discussions about refugee education policies.');
+    } finally {
+      setIsLoadingSummary(false);
+    }
+  };
+  
+  // Helper: Consolidate negotiation summary per agent (fallback method)
+  function getNegotiationSummaryByAgent(logs: any[]) {
     if (!logs || logs.length === 0) return [];
     // Group logs by agent (exclude user messages)
     const agentMap: Record<string, string[]> = {};
@@ -40,14 +76,16 @@ export default function SummaryPage() {
       summary: contents.join(' ')
     }));
   }
-  const negotiationSummaries = getNegotiationSummary(negotiationLogs);
+  
+  // Get agent-based summaries as fallback
+  const agentSummaries = getNegotiationSummaryByAgent(negotiationLogs);
   
   // Generate PDF and set up for download
   useEffect(() => {
     if (reflectionData) {
       generatePdf();
     }
-  }, [reflectionData]);
+  }, [reflectionData, negotiationSummary]);
   
   // Generate PDF using jsPDF
   const generatePdf = async () => {
@@ -169,13 +207,27 @@ export default function SummaryPage() {
       y += 5;
       
       // Add Negotiation Summary Section
-      if (negotiationSummaries.length > 0) {
-        addSectionTitle('Stakeholder Negotiation Summary');
-        negotiationSummaries.forEach(({ agent, summary }) => {
+      addSectionTitle('Stakeholder Negotiation Summary');
+      
+      if (negotiationSummary) {
+        // Add AI-generated summary
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(primaryTextColor);
+        addWrappedText(negotiationSummary, 10);
+      } else if (agentSummaries.length > 0) {
+        // Fallback to agent-based summaries
+        agentSummaries.forEach(({ agent, summary }) => {
           addWrappedText(`${agent}: ${summary}`, 11, true);
           y += 2;
         });
+      } else {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text('No negotiation data available.', margin, y);
       }
+      
+      y += 5;
       
       // Add Reflections Section
       addSectionTitle('Reflection Responses');
@@ -224,12 +276,6 @@ export default function SummaryPage() {
       const url = URL.createObjectURL(doc.output('blob'));
       setDownloadUrl(url);
       setPdfGenerated(true);
-      
-      // Show success toast
-      // toast({
-      //   title: "PDF Generated Successfully",
-      //   description: "Your summary is ready to download and send to your professor.",
-      // });
       
       return () => {
         URL.revokeObjectURL(url);
@@ -324,22 +370,36 @@ export default function SummaryPage() {
           {/* Main Content */}
           <div className="space-y-8">
             {/* Negotiation Summary Section */}
-            {negotiationSummaries.length > 0 && (
-              <Card className="bg-white transition-all duration-300 hover:shadow-md">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-2xl font-bebas">Stakeholder Negotiation Summary</CardTitle>
-                </CardHeader>
-                <CardContent>
+            <Card className="bg-white transition-all duration-300 hover:shadow-md">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-2xl font-bebas">Stakeholder Negotiation Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoadingSummary ? (
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-policy-maroon mb-2" />
+                    <p className="text-gray-600">Generating comprehensive summary...</p>
+                  </div>
+                ) : negotiationSummary ? (
+                  <div className="prose max-w-none text-gray-700">
+                    {negotiationSummary.split('\n\n').map((paragraph, i) => (
+                      <p key={i} className={i === 0 ? "font-medium" : ""}>{paragraph}</p>
+                    ))}
+                  </div>
+                ) : agentSummaries.length > 0 ? (
                   <ul className="space-y-4">
-                    {negotiationSummaries.map(({ agent, summary }) => (
+                    {agentSummaries.map(({ agent, summary }) => (
                       <li key={agent}>
                         <span className="font-semibold text-policy-maroon">{agent}:</span> {summary}
                       </li>
                     ))}
                   </ul>
-                </CardContent>
-              </Card>
-            )}
+                ) : (
+                  <p className="text-gray-500 italic">No negotiation data available.</p>
+                )}
+              </CardContent>
+            </Card>
+            
             {/* Policy Package Summary */}
             <Card className="bg-white transition-all duration-300 hover:shadow-md">
               <CardHeader className="pb-2">
@@ -366,6 +426,7 @@ export default function SummaryPage() {
                 </div>
               </CardContent>
             </Card>
+            
             {/* Equity Score */}
             <Card className="bg-white transition-all duration-300 hover:shadow-md">
               <CardHeader className="pb-2">
@@ -388,25 +449,7 @@ export default function SummaryPage() {
                 </div>
               </CardContent>
             </Card>
-            {/* AI Feedback */}
-            <Card className="bg-white transition-all duration-300 hover:shadow-md">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-2xl font-bebas">Policy Analysis</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {aiFeedback ? (
-                  <div className="prose max-w-none">
-                    <div className="bg-gray-50 p-4 rounded-md border-l-4 border-hope-turquoise">
-                      {aiFeedback.split('\n\n').map((paragraph, i) => (
-                        <p key={i} className={i === 0 ? "font-medium" : ""}>{paragraph}</p>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <p>No policy analysis available.</p>
-                )}
-              </CardContent>
-            </Card>
+            
             {/* Reflection Highlights */}
             <Card className="bg-white transition-all duration-300 hover:shadow-md">
               <CardHeader className="pb-2">
@@ -438,6 +481,27 @@ export default function SummaryPage() {
                 </div>
               </CardContent>
             </Card>
+            
+            {/* Download and Email Buttons */}
+            {pdfGenerated && (
+              <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
+                <Button 
+                  className="bg-policy-maroon text-white hover:bg-opacity-90 flex-1"
+                  onClick={handleDownloadPdf}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Summary PDF
+                </Button>
+                <Button 
+                  className="bg-hope-turquoise text-white hover:bg-opacity-90 flex-1"
+                  onClick={handleEmailPdf}
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Email to Professor
+                </Button>
+              </div>
+            )}
+            
             {/* Navigation */}
             <div className="flex justify-center mt-8">
               <Button 

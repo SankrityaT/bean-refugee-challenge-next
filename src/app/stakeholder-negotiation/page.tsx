@@ -4,10 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { useGameContext } from '@/context/GameContext';
+import { useGameContext, NegotiationLog } from '@/context/GameContext';
 import ConversationManager from '@/components/ui/ConversationManager';
 import { AgentStance } from '@/types/agents';
-import { Users, ArrowRight, MessageCircle, Lightbulb, HeartHandshake, Mic, MicOff, Send, X, ChevronRight, ChevronLeft, MessageSquare, Check } from 'lucide-react';
+import { Users, ArrowRight, MessageCircle, Lightbulb, HeartHandshake, Mic, MicOff, Send, X, ChevronRight, ChevronLeft, MessageSquare, Check, ChevronDown } from 'lucide-react';
 import { Montserrat } from 'next/font/google';
 const montserrat = Montserrat({ 
   subsets: ['latin'],
@@ -18,6 +18,7 @@ const montserrat = Montserrat({
 type AgentOpinion = 'positive' | 'negative';
 
 interface DisplayAgent {
+  id: string;
   name: string;
   stance: AgentStance;
   role: string;
@@ -104,6 +105,11 @@ const agentProfilePool: AgentProfile[] = [
   }
 ];
 
+// Extend the NegotiationLog interface to include the policyId property
+interface ExtendedNegotiationLog extends NegotiationLog {
+  policyId: string;
+}
+
 // Utility function to shuffle an array (Fisher-Yates algorithm)
 const shuffleArray = <T,>(array: T[]): T[] => {
   const newArray = [...array];
@@ -150,6 +156,10 @@ export default function PoliticalAssemblyDebatePage() {
   // Add a conversation key to force ConversationManager to reinitialize when switching policies
   const [conversationKey, setConversationKey] = useState(0);
 
+  // State for storing all conversation logs across all policies
+  const [allNegotiationLogs, setAllNegotiationLogs] = useState<ExtendedNegotiationLog[]>([]);
+  const [showFullHistory, setShowFullHistory] = useState(false);
+
   // Helper to get the currently selected policy object
   const getSelectedPolicy = () => {
     if (!selectedPolicyId) return null;
@@ -160,32 +170,91 @@ export default function PoliticalAssemblyDebatePage() {
   const selectDebateAgents = (policyId: string) => {
     const policy = getSelectedPolicyObjects().find(p => p.id === policyId);
     if (!policy) return [];
+    
     // Filter agent pool for those with possibleOpinions matching the policy
     const positiveAgents = agentProfilePool.filter(a => a.possibleOpinions.includes('positive'));
     const negativeAgents = agentProfilePool.filter(a => a.possibleOpinions.includes('negative'));
+    
     // Gender split
     const posMales = positiveAgents.filter(a => a.gender === 'male');
     const posFemales = positiveAgents.filter(a => a.gender === 'female');
     const negMales = negativeAgents.filter(a => a.gender === 'male');
     const negFemales = negativeAgents.filter(a => a.gender === 'female');
-    // Select 1 male + 1 female for each opinion if possible
-    const selected = [];
-    if (posMales.length) selected.push(posMales[Math.floor(Math.random()*posMales.length)]);
-    if (posFemales.length) selected.push(posFemales[Math.floor(Math.random()*posFemales.length)]);
-    if (negMales.length) selected.push(negMales[Math.floor(Math.random()*negMales.length)]);
-    if (negFemales.length) selected.push(negFemales[Math.floor(Math.random()*negFemales.length)]);
-    // Fallback to fill up to 4 agents
-    while (selected.length < 4) {
-      const pool = [...positiveAgents, ...negativeAgents].filter(a => !selected.includes(a));
-      if (!pool.length) break;
-      selected.push(pool[Math.floor(Math.random()*pool.length)]);
+    
+    // Track selected agents to prevent duplicates
+    const selectedAgentNames = new Set<string>();
+    const supportingAgents = [];
+    const opposingAgents = [];
+    
+    // Helper function to select a random agent while avoiding duplicates
+    const selectRandomAgent = (pool: AgentProfile[]) => {
+      // Filter out already selected agents
+      const availableAgents = pool.filter(a => !selectedAgentNames.has(a.name));
+      if (availableAgents.length === 0) return null;
+      
+      const randomIndex = Math.floor(Math.random() * availableAgents.length);
+      const selectedAgent = availableAgents[randomIndex];
+      selectedAgentNames.add(selectedAgent.name);
+      return selectedAgent;
+    };
+    
+    // Select 1 male + 1 female for supporting agents (positive opinion)
+    const posMale = selectRandomAgent(posMales);
+    if (posMale) supportingAgents.push(posMale);
+    
+    const posFemale = selectRandomAgent(posFemales);
+    if (posFemale) supportingAgents.push(posFemale);
+    
+    // Select 1 male + 1 female for opposing agents (negative opinion)
+    const negMale = selectRandomAgent(negMales);
+    if (negMale) opposingAgents.push(negMale);
+    
+    const negFemale = selectRandomAgent(negFemales);
+    if (negFemale) opposingAgents.push(negFemale);
+    
+    // Ensure we have exactly 2 supporting and 2 opposing agents
+    // If we don't have enough supporting agents, add more from any gender
+    while (supportingAgents.length < 2) {
+      const nextAgent = selectRandomAgent(positiveAgents);
+      if (!nextAgent) break; // No more unique positive agents available
+      supportingAgents.push(nextAgent);
     }
-    // Map to DisplayAgent
+    
+    // If we don't have enough opposing agents, add more from any gender
+    while (opposingAgents.length < 2) {
+      const nextAgent = selectRandomAgent(negativeAgents);
+      if (!nextAgent) break; // No more unique negative agents available
+      opposingAgents.push(nextAgent);
+    }
+    
+    // Combine supporting and opposing agents
+    const selected = [...supportingAgents, ...opposingAgents];
+    
+    // If we still don't have 4 agents, add from any available agent
+    while (selected.length < 4) {
+      const allAgents = [...positiveAgents, ...negativeAgents];
+      const nextAgent = selectRandomAgent(allAgents);
+      if (!nextAgent) break; // No more unique agents available
+      
+      // Determine if this should be a supporting or opposing agent to maintain balance
+      if (supportingAgents.length < 2) {
+        supportingAgents.push(nextAgent);
+      } else {
+        opposingAgents.push(nextAgent);
+      }
+      selected.push(nextAgent);
+    }
+    
+    // Map to DisplayAgent with unique IDs
     return selected.slice(0,4).map((profile, idx) => {
       const stance = profile.possibleStances[0];
       const age = Math.floor(Math.random() * (profile.ageRange[1] - profile.ageRange[0] + 1)) + profile.ageRange[0];
-      const opinion = profile.possibleOpinions[0];
+      
+      // Assign opinion based on which group the agent is in
+      const opinion = supportingAgents.includes(profile) ? 'positive' as const : 'negative' as const;
+      
       return {
+        id: `${profile.name.replace(/\s+/g, '-')}-${idx}`, // Add unique ID
         name: profile.name,
         role: profile.role,
         stance: stance,
@@ -204,6 +273,7 @@ export default function PoliticalAssemblyDebatePage() {
       setSelectedAgents(selectDebateAgents(selectedPolicyId));
     }
   }, [selectedPolicyId]);
+
   const [showTutorial, setShowTutorial] = useState(true);
   const [currentPolicy, setCurrentPolicy] = useState<any>(null);
   const [negotiationComplete, setNegotiationComplete] = useState(false);
@@ -266,25 +336,68 @@ export default function PoliticalAssemblyDebatePage() {
       const shuffledMales = shuffleArray([...maleAgents]);
       const shuffledFemales = shuffleArray([...femaleAgents]);
       
-      // Select 2 from each gender
-      const selectedMales = shuffledMales.slice(0, 2);
-      const selectedFemales = shuffledFemales.slice(0, 2);
+      // Track selected agents to prevent duplicates
+      const selectedAgentNames = new Set<string>();
+      const supportingAgents = [];
+      const opposingAgents = [];
       
-      // Combine and shuffle again
-      const combinedAgents = [...selectedMales, ...selectedFemales];
-      const shuffledCombined = shuffleArray(combinedAgents);
+      // Helper function to select unique agents
+      const selectUniqueAgents = (pool: AgentProfile[], count: number) => {
+        const result = [];
+        for (const agent of pool) {
+          if (result.length >= count) break;
+          if (!selectedAgentNames.has(agent.name)) {
+            selectedAgentNames.add(agent.name);
+            result.push(agent);
+          }
+        }
+        return result;
+      };
       
-      // Assign opinions to ensure 2 positive and 2 negative
-      return shuffledCombined.map((profile, index) => {
+      // Select 1 male + 1 female for supporting agents
+      const supportingMale = selectUniqueAgents(shuffledMales.filter(a => a.possibleOpinions.includes('positive')), 1);
+      const supportingFemale = selectUniqueAgents(shuffledFemales.filter(a => a.possibleOpinions.includes('positive')), 1);
+      supportingAgents.push(...supportingMale, ...supportingFemale);
+      
+      // Select 1 male + 1 female for opposing agents
+      const opposingMale = selectUniqueAgents(shuffledMales.filter(a => a.possibleOpinions.includes('negative')), 1);
+      const opposingFemale = selectUniqueAgents(shuffledFemales.filter(a => a.possibleOpinions.includes('negative')), 1);
+      opposingAgents.push(...opposingMale, ...opposingFemale);
+      
+      // Ensure we have exactly 2 supporting and 2 opposing agents
+      while (supportingAgents.length < 2) {
+        const availableAgents = shuffleArray([...maleAgents, ...femaleAgents])
+          .filter(a => a.possibleOpinions.includes('positive') && !selectedAgentNames.has(a.name));
+        
+        if (availableAgents.length === 0) break;
+        selectedAgentNames.add(availableAgents[0].name);
+        supportingAgents.push(availableAgents[0]);
+      }
+      
+      while (opposingAgents.length < 2) {
+        const availableAgents = shuffleArray([...maleAgents, ...femaleAgents])
+          .filter(a => a.possibleOpinions.includes('negative') && !selectedAgentNames.has(a.name));
+        
+        if (availableAgents.length === 0) break;
+        selectedAgentNames.add(availableAgents[0].name);
+        opposingAgents.push(availableAgents[0]);
+      }
+      
+      // Combine and shuffle
+      const combinedAgents = shuffleArray([...supportingAgents, ...opposingAgents]);
+      
+      // Map to DisplayAgent with unique IDs
+      return combinedAgents.map((profile, index) => {
         // Randomly select a stance from the possible stances for this agent
         const stance = profile.possibleStances[Math.floor(Math.random() * profile.possibleStances.length)];
         // Randomly select an age within the agent's age range
         const age = Math.floor(Math.random() * (profile.ageRange[1] - profile.ageRange[0] + 1)) + profile.ageRange[0];
         
-        // Assign opinion based on index to ensure balance
-        const opinion = index < 2 ? 'positive' as const : 'negative' as const;
+        // Assign opinion based on which group the agent is in
+        const opinion = supportingAgents.includes(profile) ? 'positive' as const : 'negative' as const;
         
         return {
+          id: `${profile.name.replace(/\s+/g, '-')}-${index}`, // Add unique ID
           name: profile.name,
           role: profile.role,
           stance: stance,
@@ -304,8 +417,92 @@ export default function PoliticalAssemblyDebatePage() {
   useEffect(() => {
     if (policySpecificMode) {
       setCurrentPolicy(getCurrentPolicy());
+      
+      // Don't clear conversation logs when switching policies
+      // Instead, just reset the conversation key to force ConversationManager to reinitialize
+      // with the correct agents while preserving the full history
+      setConversationKey(Date.now());
     }
   }, [currentPolicyIndex, policySpecificMode]);
+
+  // Update all logs whenever negotiation logs change
+  useEffect(() => {
+    if (negotiationLogs.length > 0) {
+      // Add policy ID to each log if not already present and ensure all required properties exist
+      const logsWithPolicy = negotiationLogs.map(log => {
+        // Ensure content property is always defined
+        const messageContent = log.content || '';
+        
+        // Ensure agent name is properly set
+        let agentName = log.agent;
+        if (!agentName || agentName === 'Unknown Speaker') {
+          agentName = log.isUser ? 'Policy Advisor' : 'System';
+        }
+        
+        // Ensure emotion is properly set
+        let emotion = log.emotion;
+        if (!emotion || emotion === 'neutral') {
+          emotion = log.isUser ? 'Neutral' : 'Neutral';
+        }
+        
+        // Capitalize first letter of emotion for consistency
+        if (emotion && typeof emotion === 'string') {
+          emotion = emotion.charAt(0).toUpperCase() + emotion.slice(1).toLowerCase();
+        }
+        
+        return {
+          ...log,
+          policyId: selectedPolicyId || 'general',
+          isUser: log.isUser || false, // Ensure isUser is always defined
+          content: messageContent, // Ensure content property is always defined
+          timestamp: log.timestamp || new Date().toISOString(), // Ensure timestamp is always defined
+          agent: agentName, // Use the properly set agent name
+          emotion: emotion, // Use the properly formatted emotion
+          id: log.id || `log-${Date.now()}-${Math.random().toString(36).substring(2, 9)}` // Ensure each log has a unique ID
+        } as ExtendedNegotiationLog;
+      });
+      
+      // Update all logs while preserving logs from other policies
+      setAllNegotiationLogs(prev => {
+        // Instead of removing logs for the current policy, we'll keep all logs
+        // and just add the new ones that aren't already in the array
+        
+        // Create a map of existing log IDs for quick lookup
+        const existingLogIds = new Set(prev.map(log => log.id));
+        
+        // Filter out logs that already exist in prev
+        const newLogs = logsWithPolicy.filter(log => !existingLogIds.has(log.id));
+        
+        // Combine previous logs with new logs and sort by timestamp
+        return [...prev, ...newLogs].sort((a, b) => 
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
+      });
+    }
+  }, [negotiationLogs, selectedPolicyId]);
+
+  // Helper to check if user has replied at least 4 times for the CURRENT policy only
+  const hasRepliedEnoughTimes = () => {
+    // Only count replies for the current policy
+    const currentPolicyReplies = allNegotiationLogs.filter(log => 
+      log.isUser && log.policyId === selectedPolicyId
+    );
+    
+    return currentPolicyReplies.length >= 4;
+  };
+
+  // Helper to get logs for a specific policy with proper chronological ordering
+  const getPolicyLogs = (policyId: string) => {
+    if (!policyId) return [];
+    
+    // Get all logs for this policy
+    const policyLogs = allNegotiationLogs.filter(log => log.policyId === policyId);
+    
+    // Sort logs by timestamp to ensure chronological order
+    return policyLogs.sort((a, b) => 
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+  };
 
   // Helper to check if user has replied to all 4 agents at least once
   const hasUserRepliedToAllAgents = () => {
@@ -314,6 +511,32 @@ export default function PoliticalAssemblyDebatePage() {
     return selectedAgents.every(agent =>
       negotiationLogs.some(log => log.isUser && log.agent === agent.name)
     );
+  };
+
+  // Helper to check if user has replied at least X times - this is the SINGLE source of truth
+  const getUserReplyCount = () => {
+    if (negotiationLogs.length === 0) return 0;
+    
+    // Count user replies for the current policy only
+    const currentPolicyUserReplies = allNegotiationLogs.filter(log => 
+      log.isUser && log.policyId === selectedPolicyId
+    );
+    
+    return currentPolicyUserReplies.length;
+  };
+
+  // Helper to display the remaining replies needed
+  const getRemainingRepliesText = () => {
+    const repliesCount = getUserReplyCount();
+    const remaining = Math.max(0, 4 - repliesCount);
+    
+    if (remaining === 0) {
+      return "You can now proceed to the ethical reflection phase";
+    } else if (remaining === 1) {
+      return "1 more reply needed before proceeding";
+    } else {
+      return `${remaining} more replies needed before proceeding`;
+    }
   };
 
   const handleContinue = () => {
@@ -328,12 +551,13 @@ export default function PoliticalAssemblyDebatePage() {
         });
       }
     } else {
-      if (hasUserRepliedToAllAgents()) {
+      // Make sure this is consistent with the button's enabled state
+      if (hasRepliedEnoughTimes()) {
         router.push('/ethical-reflection');
       } else {
         toast({
           title: "Cannot Proceed",
-          description: "Please reply to each agent at least once before moving to ethical reflection.",
+          description: `Please reply ${getUserReplyCount()}/4 times before moving to ethical reflection.`,
           variant: "destructive",
         });
       }
@@ -433,9 +657,59 @@ export default function PoliticalAssemblyDebatePage() {
     return colors[Math.floor(Math.random() * colors.length)];
   };
 
+  const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
+
   // UI for policy selection
   const selectedPolicy = getSelectedPolicy();
   const selectedPolicies = getSelectedPolicyObjects();
+
+  // State for tracking which policies have been discussed
+  const [discussedPolicies, setDiscussedPolicies] = useState<string[]>([]);
+  
+  // State for tracking expanded policy discussions in the history view
+  const [expandedPolicies, setExpandedPolicies] = useState<Record<string, boolean>>({});
+  
+  // Update discussed policies when a policy discussion is completed
+  useEffect(() => {
+    if (currentPolicyDebateComplete && selectedPolicyId && !discussedPolicies.includes(selectedPolicyId)) {
+      setDiscussedPolicies(prev => [...prev, selectedPolicyId]);
+    }
+  }, [currentPolicyDebateComplete, selectedPolicyId, discussedPolicies]);
+  
+  // Helper to toggle a policy's expanded state in the history view
+  const togglePolicyExpanded = (policyId: string) => {
+    setExpandedPolicies(prev => ({
+      ...prev,
+      [policyId]: !prev[policyId]
+    }));
+  };
+  
+  // Helper function to get emotion color class based on emotion type
+  const getEmotionColorClass = (emotion: string): string => {
+    const emotionMap: Record<string, string> = {
+      'Neutral': 'text-gray-500',
+      'Anger': 'text-red-500',
+      'Frustration': 'text-orange-500',
+      'Disappointment': 'text-amber-500',
+      'Concern': 'text-yellow-600',
+      'Interest': 'text-blue-500',
+      'Enthusiasm': 'text-green-500',
+      'Satisfaction': 'text-emerald-500',
+      'Compassion': 'text-purple-500',
+      'Determination': 'text-indigo-500',
+      'Confusion': 'text-pink-500',
+      'Doubt': 'text-rose-500',
+      'Contemplation': 'text-cyan-500',
+      'Boredom': 'text-slate-500',
+      'Disapproval': 'text-red-600'
+    };
+    
+    // Normalize emotion string for lookup
+    const normalizedEmotion = emotion.charAt(0).toUpperCase() + emotion.slice(1).toLowerCase();
+    
+    // Return the color class or default to gray
+    return emotionMap[normalizedEmotion] || 'text-gray-500';
+  };
 
   return (
     <div className={`min-h-screen bg-[#eac95d] text-white flex flex-col font-sans relative overflow-hidden ${montserrat.variable}`} style={{ fontFamily: 'var(--font-montserrat)' }}>
@@ -510,28 +784,41 @@ export default function PoliticalAssemblyDebatePage() {
               <Button
                 variant="outline"
                 onClick={handlePreviousPolicy}
-                disabled={currentPolicyIndex === 0}
+                disabled={currentPolicyIndex === 0 || isAgentSpeaking}
+                className={`${isAgentSpeaking ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                <ArrowRight className="mr-2 h-4 w-4 rotate-180" /> Previous Policy
+                <ArrowRight className="mr-2 h-4 w-4 rotate-180" /> 
+                {isAgentSpeaking ? "Please wait..." : "Previous Policy"}
               </Button>
               
-              <div className="text-center">
-                <span className="text-sm text-gray-500">
-                  Policy {currentPolicyIndex + 1} of {policyOrder.length}
-                </span>
+              <div className="text-sm text-gray-500">
+                {isAgentSpeaking ? (
+                  <span className="text-amber-600 font-medium flex items-center">
+                    <span className="mr-1">Agent speaking</span>
+                    <span className="flex space-x-1">
+                      <span className="h-1.5 w-1.5 bg-amber-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                      <span className="h-1.5 w-1.5 bg-amber-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                      <span className="h-1.5 w-1.5 bg-amber-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                    </span>
+                  </span>
+                ) : (
+                  <span>Policy {currentPolicyIndex + 1} of {selectedPolicies.length}</span>
+                )}
               </div>
               
               <Button
                 variant={negotiationComplete ? "default" : "outline"}
                 onClick={negotiationComplete ? handleContinue : handleNextPolicy}
+                disabled={isAgentSpeaking}
+                className={`${isAgentSpeaking ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {negotiationComplete ? (
                   <>
-                    Continue <Check className="ml-2 h-4 w-4" />
+                    {isAgentSpeaking ? "Please wait..." : "Continue"} <Check className="ml-2 h-4 w-4" />
                   </>
                 ) : (
                   <>
-                    Next Policy <ArrowRight className="ml-2 h-4 w-4" />
+                    {isAgentSpeaking ? "Please wait..." : "Next Policy"} <ArrowRight className="ml-2 h-4 w-4" />
                   </>
                 )}
               </Button>
@@ -710,6 +997,7 @@ export default function PoliticalAssemblyDebatePage() {
                     title: selectedPolicy.title,
                     description: selectedPolicy.description
                   } : undefined}
+                  onAgentSpeakingChange={setIsAgentSpeaking}
                 />
                 
                 {/* Finish debate button */}
@@ -756,7 +1044,9 @@ export default function PoliticalAssemblyDebatePage() {
                     <div className="text-xs text-gray-700 flex items-center gap-1">
                       <span className="font-medium">{policy.area}</span>
                       <span className="text-[#6E1E1E]/60">•</span>
-                      <span className="bg-[#6E1E1E]/10 text-[#6E1E1E] px-2 py-0.5 rounded-full">Tier {policy.tier}</span>
+                      <span className="bg-[#6E1E1E]/10 text-[#6E1E1E] px-2 py-0.5 rounded-full">
+                        Tier {policy.tier}
+                      </span>
                     </div>
                   </div>
                 ))
@@ -773,7 +1063,7 @@ export default function PoliticalAssemblyDebatePage() {
               <div className="text-xs text-[#6E1E1E]/80 mb-3">These are your fellow colleagues for this discussion.</div>
               <div className="flex flex-col gap-3">
                 {selectedAgents.map((agent) => (
-                  <div key={agent.name} className="flex items-center gap-3 bg-white rounded-lg px-3 py-2 shadow-sm border border-[#eac95d]/40 hover:shadow-md transition-shadow duration-200">
+                  <div key={agent.id} className="flex items-center gap-3 bg-white rounded-lg px-3 py-2 shadow-sm border border-[#eac95d]/40 hover:shadow-md transition-shadow duration-200">
                     <div className="flex items-center justify-center h-8 w-8 rounded-full bg-[#eac95d]/30 text-[#6E1E1E] font-bold text-base uppercase shadow-sm">
                       {agent.name.split(' ').map(w => w[0]).join('')}
                     </div>
@@ -782,6 +1072,148 @@ export default function PoliticalAssemblyDebatePage() {
                 ))}
               </div>
             </div>
+            
+            {/* Full conversation history - show ALL logs across policies */}
+            <div className="mt-8 bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+              <div 
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => setShowFullHistory(!showFullHistory)}
+              >
+                <h3 className="text-lg font-bold text-gray-800 flex items-center">
+                  <MessageSquare className="h-5 w-5 mr-2 text-[#6E1E1E]" />
+                  Complete Transcript History
+                  {allNegotiationLogs.length > 0 && (
+                    <span className="ml-2 bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">
+                      {allNegotiationLogs.length} messages
+                    </span>
+                  )}
+                </h3>
+                <ChevronDown className={`h-5 w-5 transition-transform ${showFullHistory ? 'rotate-180' : ''}`} />
+              </div>
+              
+              {showFullHistory && (
+                <div className="mt-4">
+                  {/* Complete transcript of all messages */}
+                  <div className="border rounded-lg overflow-hidden bg-white mb-4">
+                    <div className="p-3 bg-gradient-to-r from-blue-100 to-white flex justify-between items-center border-b">
+                      <div className="flex items-center">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                        <h4 className="font-medium text-gray-700">
+                          Complete Conversation Transcript
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                          All Messages
+                        </span>
+                        {allNegotiationLogs.length > 0 && (
+                          <span className="text-xs text-gray-500">
+                            {allNegotiationLogs.length} total messages
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Show ALL messages without filtering */}
+                    <div className="divide-y max-h-[600px] overflow-y-auto">
+                      {allNegotiationLogs.length > 0 ? (
+                        // Filter out "Unknown Speaker" entries with empty content and deduplicate
+                        allNegotiationLogs
+                          .filter(log => log.content && log.content.trim() !== '')
+                          // Remove duplicate messages (same content and agent within 1 second)
+                          .filter((log, index, self) => {
+                            // Always keep the first occurrence
+                            if (index === 0) return true;
+                            
+                            // Check if this is a duplicate of a previous message
+                            const prevLog = self[index - 1];
+                            const sameContent = log.content === prevLog.content;
+                            const sameAgent = log.agent === prevLog.agent;
+                            const closeTimestamp = Math.abs(
+                              new Date(log.timestamp).getTime() - new Date(prevLog.timestamp).getTime()
+                            ) < 1000; // Within 1 second
+                            
+                            // Keep if not a duplicate
+                            return !(sameContent && sameAgent && closeTimestamp);
+                          })
+                          .map((log, idx) => (
+                          <div key={`log-${idx}`} className="p-3 hover:bg-gray-50">
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0">
+                                <div className={`h-8 w-8 rounded-full ${log.isUser ? 'bg-blue-100 text-blue-800' : 'bg-[#eac95d]/30 text-[#6E1E1E]'} flex items-center justify-center font-medium`}>
+                                  {log.isUser ? 'P' : (log.agent && log.agent !== 'Unknown Speaker' ? log.agent.charAt(0) : 'S')}
+                                </div>
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex justify-between items-center mb-1">
+                                  <div className="font-medium text-gray-900">
+                                    {log.isUser ? 'Policy Advisor' : (log.agent !== 'Unknown Speaker' ? log.agent : 'System')}
+                                  </div>
+                                  <div className="text-xs text-gray-500 flex items-center gap-2">
+                                    <span className="bg-gray-100 px-2 py-0.5 rounded-full text-xs">
+                                      {getSelectedPolicyObjects().find(p => p.id === log.policyId)?.title || log.policyId}
+                                    </span>
+                                    {new Date(log.timestamp).toLocaleTimeString()}
+                                  </div>
+                                </div>
+                                <div className="text-gray-700 whitespace-pre-wrap">
+                                  {log.content}
+                                </div>
+                                {log.emotion && (
+                                  <div className={`mt-1 text-xs italic ${getEmotionColorClass(log.emotion)}`}>
+                                    Emotion: {log.emotion}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-4 text-center text-gray-500">
+                          No messages in the transcript yet
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Add Continue to Reflection button */}
+            {isConversationStarted && (
+              <div className="mt-6">
+                <Button
+                  onClick={handleContinue}
+                  disabled={isAgentSpeaking || !hasRepliedEnoughTimes()}
+                  className={`w-full bg-gradient-to-r from-[#388E3C] to-[#42A5F5] text-white font-medium py-2 px-4 rounded-lg shadow-md transition-all duration-300 ${(isAgentSpeaking || !hasRepliedEnoughTimes()) ? 'opacity-50 cursor-not-allowed' : 'hover:from-[#2E7D32] hover:to-[#1976D2] hover:shadow-lg'}`}
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    {isAgentSpeaking ? (
+                      <>
+                        Please wait for agent to finish
+                        <span className="ml-2 flex space-x-1">
+                          <span className="h-2 w-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                          <span className="h-2 w-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                          <span className="h-2 w-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        Continue to Reflection
+                        <ArrowRight className="h-5 w-5" />
+                      </>
+                    )}
+                  </span>
+                </Button>
+                <p className="text-xs text-center text-gray-600 mt-2">
+                  {isAgentSpeaking 
+                    ? "Please wait for the current speaker to finish before proceeding" 
+                    : !hasRepliedEnoughTimes()
+                      ? getRemainingRepliesText()
+                      : "You can now proceed to the ethical reflection phase"}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </main>

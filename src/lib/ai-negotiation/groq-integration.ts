@@ -102,6 +102,14 @@ const createGroqPrompt = (
     return `- ${policy.title} (${policy.area}): ${policy.description} [Tier ${policy.tier}]`;
   }).join('\n');
   
+  // Determine if this is a financial policy or not
+  const isFinancialPolicy = selectedPolicies.some(policy => 
+    policy.area.toLowerCase().includes('financial') || 
+    policy.title.toLowerCase().includes('financial') ||
+    policy.title.toLowerCase().includes('finance') ||
+    policy.area.toLowerCase().includes('finance')
+  );
+  
   // Extract the last user message if available
   let lastUserMessage = "";
   let userMessageSection = "";
@@ -139,6 +147,11 @@ const createGroqPrompt = (
     ${conversationContext}
   ` : '';
   
+  // Add policy-specific focus guidance based on whether it's a financial policy
+  const policyFocusGuidance = isFinancialPolicy ? 
+    `As this is a financial policy, you may discuss budgetary implications, cost-effectiveness, and economic impacts.` : 
+    `As this is NOT a financial policy, focus on the educational, social, and humanitarian aspects of the policy rather than financial considerations. Avoid discussing costs, budgets, or financial implications unless directly asked.`;
+  
   // Combine all elements into a comprehensive prompt
   return `
     You are ${agentName}, a stakeholder in the Republic of Bean refugee education policy simulation.
@@ -151,6 +164,8 @@ const createGroqPrompt = (
     ${policiesText}
     
     Based on your political stance and personality, you feel ${sentiment} about these policies.
+    
+    ${policyFocusGuidance}
     
     ${contextSection}
     
@@ -168,6 +183,7 @@ const createGroqPrompt = (
     5. Show your personality through your word choice and tone
     6. If the user asked a question, answer it from your character's perspective
     7. If the user expressed an opinion that conflicts with yours, politely disagree and explain why
+    ${!isFinancialPolicy ? '8. For this non-financial policy, focus on educational, social, and humanitarian aspects rather than costs or budgets' : ''}
   `;
 };
 

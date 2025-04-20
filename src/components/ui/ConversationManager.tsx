@@ -14,6 +14,7 @@ import EmotionAvatar from '../EmotionAvatar';
 import { useToast } from '@/hooks/use-toast';
 import { useGameContext } from '@/context/GameContext';
 import { v4 as uuidv4 } from 'uuid';
+import Image from 'next/image';
 
 interface Message {
   id: string;
@@ -29,6 +30,7 @@ interface Message {
 interface ConversationManagerProps {
   selectedPolicies: PolicyWithArea[];
   agents: {
+    id: string; // Add id property
     name: string;
     stance: AgentStance;
     avatar: string;
@@ -45,6 +47,8 @@ interface ConversationManagerProps {
   // Add new props for policy-specific mode
   policySpecificMode?: boolean;
   currentPolicyArea?: PolicyAreaContext;
+  // Add new prop to track agent speaking state
+  onAgentSpeakingChange?: (isSpeaking: boolean) => void;
 }
 
 const ConversationManager: React.FC<ConversationManagerProps> = ({
@@ -56,7 +60,8 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
   showAgentVoice = true,
   showEmotion = true,
   policySpecificMode = false,
-  currentPolicyArea
+  currentPolicyArea,
+  onAgentSpeakingChange
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState('');
@@ -111,6 +116,9 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
     prevPolicyAreaRef.current = currentPolicyId;
     initializedRef.current = true;
     
+    // Don't clear existing messages when switching policies
+    // Instead, filter them to only show relevant ones for the current policy
+    
     // Only run this effect when the policy area changes or on initial mount
     if (policySpecificMode && currentPolicyArea && addPolicyNegotiationLog) {
       // Load policy-specific messages
@@ -119,17 +127,41 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
         : [];
       
       if (policyMessages.length > 0) {
+        // Filter messages to only include current agents and user
+        const currentAgentNames = new Set(agents.map(agent => agent.name));
+        const filteredMessages = policyMessages.filter(log => 
+          log.isUser || currentAgentNames.has(log.agent)
+        );
+        
         // Use functional update to avoid dependency on messages
-        setMessages(policyMessages.map(log => ({
-          id: log.id || uuidv4(),
-          sender: log.agent,
-          content: log.content,
-          timestamp: new Date(log.timestamp),
-          emotion: log.emotion,
-          isUser: log.isUser,
-          policyAreaId: log.policyAreaId
-        })));
-      } else if (!conversationStarted.current) {
+        setMessages(prev => {
+          // Keep previous messages and add policy-specific ones
+          // This preserves the full conversation history
+          return [...prev, ...filteredMessages.map(log => ({
+            id: log.id || uuidv4(),
+            sender: log.agent,
+            content: log.content,
+            timestamp: new Date(log.timestamp),
+            emotion: log.emotion,
+            isUser: log.isUser,
+            policyAreaId: log.policyAreaId
+          }))];
+        });
+      } else if (!messages.some(msg => msg.policyAreaId === currentPolicyArea.id)) {
+        // Initialize with welcome message for this policy area if no messages exist for it
+        const initialMessage: Message = {
+          id: uuidv4(),
+          sender: "System",
+          content: `Let's discuss the ${currentPolicyArea.title} policy.`,
+          timestamp: new Date(),
+          emotion: "Neutral",
+          isUser: false,
+          policyAreaId: currentPolicyArea.id
+        };
+        
+        // Add to existing messages instead of replacing them
+        setMessages(prev => [...prev, initialMessage]);
+      } else {
         // Initialize with welcome message for this policy area
         const initialMessage: Message = {
           id: uuidv4(),
@@ -185,10 +217,21 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
       setMessages([welcomeMessage]);
 
       setTimeout(() => {
+        // Use the first agent from the provided agents array, not a hardcoded agent
         triggerAgentResponse(agents[0].name);
       }, 2000);
     }
   }, [policySpecificMode, currentPolicyArea, agents, userTitle, addPolicyNegotiationLog, getPolicyNegotiationLogs]);
+
+  useEffect(() => {
+    // Don't reset messages when agents change, but do reset other state
+    conversationStarted.current = true; // Keep conversation started
+    initializedRef.current = false; // Force reinitialization
+    prevPolicyAreaRef.current = null; // Reset policy tracking
+    
+    // Reset the last agent to prevent incorrect agent selection
+    setLastAgent(null);
+  }, [agents]);
 
   useEffect(() => {
     scrollToBottom();
@@ -197,40 +240,22 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
   // Use a ref to track if we need to update the parent component
   const shouldUpdateParent = useRef(false);
   
-  // Update parent component with conversation logs, but use a ref to prevent infinite loops
+  // Update conversation logs for parent component
   useEffect(() => {
-    // Only update if messages have actually changed and we have a callback
     if (onConversationUpdate && shouldUpdateParent.current) {
-      const logs = messages.map(msg => {
-        if (msg.isUser) {
-          return {
-            agent: msg.respondingTo || '',
-            content: msg.content,
-            timestamp: msg.timestamp.toISOString(),
-            emotion: msg.emotion,
-            isUser: msg.isUser,
-            policyAreaId: msg.policyAreaId,
-            id: msg.id
-          };
-        } else {
-          return {
-            agent: msg.sender,
-            content: msg.content,
-            timestamp: msg.timestamp.toISOString(),
-            emotion: msg.emotion,
-            isUser: msg.isUser,
-            policyAreaId: msg.policyAreaId,
-            id: msg.id
-          };
-        }
-      });
+      // Convert all messages to the format expected by the parent component
+      const allLogs = messages.map(msg => ({
+        agent: msg.isUser ? 'Policy Advisor' : msg.sender,
+        content: msg.content,
+        isUser: msg.isUser || false,
+        timestamp: msg.timestamp.toISOString(),
+        emotion: msg.emotion || 'neutral',
+        id: msg.id,
+        policyAreaId: msg.policyAreaId
+      }));
       
-      // Use setTimeout to break potential circular dependencies
-      setTimeout(() => {
-        onConversationUpdate(logs);
-      }, 0);
-      
-      // Reset the flag after updating
+      // Update the parent with ALL messages
+      onConversationUpdate(allLogs);
       shouldUpdateParent.current = false;
     }
   }, [messages, onConversationUpdate]);
@@ -240,10 +265,13 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
   };
 
   const getNextRespondingAgent = (allAgents: any[]): any => {
-    // Track which agents have already spoken
+    // Create a set of current agent names for quick lookup
+    const currentAgentNames = new Set(allAgents.map(agent => agent.name));
+    
+    // Get all agents who have spoken in this conversation
     const agentsWhoSpoke = new Set(
       messages
-        .filter(msg => !msg.isUser && allAgents.some(a => a.name === msg.sender))
+        .filter(msg => !msg.isUser && currentAgentNames.has(msg.sender)) // Only count current agents
         .map(msg => msg.sender)
     );
     
@@ -256,7 +284,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
       // Get the most recent non-user messages (up to 4)
       const recentSpeakers = messages
         .slice(-4)
-        .filter(msg => !msg.isUser)
+        .filter(msg => !msg.isUser && currentAgentNames.has(msg.sender)) // Only count current agents
         .map(msg => msg.sender);
       
       // Most importantly, never select the agent who just spoke last
@@ -292,7 +320,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
       setUserEmotion(detectedEmotion);
       const userMessage: Message = {
         id: `user-${Date.now()}`,
-        sender: userTitle,
+        sender: 'Policy Advisor', // Always use 'Policy Advisor' for user messages
         content: userInput,
         timestamp: new Date(),
         emotion: detectedEmotion,
@@ -309,7 +337,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
       if (policySpecificMode && currentPolicyArea && addPolicyNegotiationLog) {
         setTimeout(() => {
           addPolicyNegotiationLog({
-            agent: userMessage.sender,
+            agent: 'Policy Advisor', // Always use 'Policy Advisor' for user messages
             content: userMessage.content,
             timestamp: userMessage.timestamp.toISOString(),
             emotion: userMessage.emotion,
@@ -320,12 +348,6 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
         }, 0);
       }
       
-      // Use setTimeout to break circular dependencies when updating parent
-      setTimeout(() => {
-        if (onConversationUpdate) {
-          onConversationUpdate(messages.concat(userMessage));
-        }
-      }, 0);
       setWaitingForUserResponse(false);
       const nextAgent = getNextRespondingAgent(agents);
       if (nextAgent) {
@@ -351,21 +373,40 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
   };
 
   const triggerAgentResponse = async (agentName: string, respondToUserId: string | null = null) => {
-    // Check if an agent is already responding to prevent duplicate responses
-    if (isAgentRespondingRef.current) {
-      console.log('Agent already responding, skipping duplicate response');
+    // Only allow agents that are in the current agents list
+    const agentExists = agents.some(agent => agent.name === agentName);
+    if (!agentExists) {
+      console.error(`Agent ${agentName} not found in current agents list`);
       return;
     }
     
-    // Set the response lock
-    isAgentRespondingRef.current = true;
+    // Make sure the agent is not the same as the last speaker
+    if (agentName === lastAgent && messages.length > 1) {
+      console.error(`Agent ${agentName} cannot speak twice in a row`);
+      // Select a different agent
+      const differentAgent = agents.find(a => a.name !== agentName);
+      if (differentAgent) {
+        agentName = differentAgent.name;
+      } else {
+        return; // No other agent available
+      }
+    }
     
-    setActiveAgent(agentName);
+    // Prevent multiple agents from responding at once
+    if (isAgentRespondingRef.current) {
+      return;
+    }
+    
+    isAgentRespondingRef.current = true;
     setIsAgentLoading(true);
-    setIsSpeaking(false);
-    setLastAgent(agentName);
+    setActiveAgent(agentName);
+    
+    // Get the agent object
     const agent = agents.find(a => a.name === agentName);
     if (!agent) {
+      console.error(`Agent ${agentName} not found`);
+      setIsAgentLoading(false);
+      setActiveAgent(null);
       isAgentRespondingRef.current = false;
       return;
     }
@@ -543,6 +584,70 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (onAgentSpeakingChange) {
+      onAgentSpeakingChange(isSpeaking);
+    }
+  }, [isSpeaking, onAgentSpeakingChange]);
+
+  useEffect(() => {
+    return () => {
+      if (onAgentSpeakingChange) {
+        onAgentSpeakingChange(false);
+      }
+    };
+  }, [onAgentSpeakingChange]);
+
+  const handleSubmit = async () => {
+    if (!userInput.trim()) return;
+    
+    // Create a new message object
+    const newMessage: Message = {
+      id: uuidv4(),
+      sender: userTitle || 'User',
+      content: userInput,
+      timestamp: new Date(),
+      isUser: true,
+      respondingTo: lastAgent,
+      policyAreaId: currentPolicyArea?.id
+    };
+    
+    // Add the message to the conversation
+    setMessages(prev => [...prev, newMessage]);
+    
+    // Reset the input field
+    setUserInput('');
+    
+    // Update conversation logs for parent component
+    if (onConversationUpdate) {
+      const updatedLogs = [
+        ...messages.map(msg => ({
+          agent: msg.respondingTo,
+          message: msg.content,
+          isUser: msg.isUser || false,
+          timestamp: msg.timestamp,
+          emotion: msg.emotion || 'neutral'
+        })),
+        {
+          agent: lastAgent,
+          message: userInput,
+          isUser: true,
+          timestamp: new Date(),
+          emotion: 'neutral'
+        }
+      ];
+      onConversationUpdate(updatedLogs);
+    }
+    
+    // Generate agent response - but make sure it's not the same agent who just spoke
+    const nextAgent = getNextRespondingAgent(agents);
+    if (nextAgent) {
+      setTimeout(() => {
+        triggerAgentResponse(nextAgent.name, newMessage.id);
+      }, 1000);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-white rounded-lg shadow-sm overflow-hidden text-black relative">
       {/* Live Debate Section */}
@@ -554,8 +659,8 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
         </div>
       </div>
       {/* Five Speaker Boxes Layout */}
-      <div className="flex-1 bg-gray-50 p-3">
-        <div className="grid grid-cols-4 grid-rows-2 gap-3 h-full">
+      <div className="flex-1 bg-gray-50 p-3 flex flex-col h-full">
+        <div className="grid grid-cols-4 gap-3 mb-3">
           {/* Loading indicator overlay when waiting for agent response */}
           {isAgentLoading && activeAgent && (
             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
@@ -572,7 +677,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
           {/* Top Row - 4 agents */}
           {agents.slice(0, 4).map((agent, index) => (
             <div 
-              key={`agent-${agent.name}-${index}`} 
+              key={agent.id} 
               className={`bg-white rounded-lg shadow-sm p-3 flex flex-col overflow-hidden ${
                 activeAgent === agent.name ? 'ring-2 ring-policy-maroon' : ''
               }`}
@@ -622,55 +727,20 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
                   <div className="text-gray-400 italic">No messages yet</div>
                 )}
               </div>
-              
-              {/* Removed political stance display as requested by user */}
             </div>
           ))}
+        </div>
           
-          {/* Bottom Row - Policy Advisor (You) */}
-          <div className="bg-policy-maroon text-white rounded-lg shadow-sm p-3 flex flex-col col-span-4">
-            <div className="flex items-center mb-2">
-              <div className="flex-shrink-0 w-8 h-8 bg-white rounded-full flex items-center justify-center mr-2 text-policy-maroon">
-                P
-              </div>
-              <div>
-                <div className="font-medium">{userTitle}</div>
-                <div className="text-xs text-white text-opacity-80">Ministry of Refugee Affairs</div>
-              </div>
-              <div className="ml-auto flex flex-col items-end gap-1">
-                {isListening && (
-                  <div className="flex items-center">
-                    <div className="h-2 w-2 bg-green-500 rounded-full mr-1"></div>
-                    <span className="text-xs text-green-600">Listening</span>
-                  </div>
-                )}
-                {messages.filter(msg => msg.isUser).length > 0 && (
-                  <EmotionMeter 
-                    emotion={messages.filter(msg => msg.isUser).slice(-1)[0]?.emotion as EmotionType || 'neutral'}
-                    size="sm"
-                    showIntensity={true}
-                  />
-                )}
-              </div>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto text-sm bg-white bg-opacity-20 rounded p-2 text-white">
-              {messages
-                .filter(msg => msg.isUser)
-                .slice(-1)
-                .map(msg => (
-                  <div key={msg.id}>
-                    <div className="text-xs text-gray-200 mb-1">
-                      {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </div>
-                    <div className="text-white">{msg.content}</div>
-                  </div>
-                ))}
-              {messages.filter(msg => msg.isUser).length === 0 && (
-                <div className="text-gray-200 italic">No messages yet</div>
-              )}
-            </div>
-          </div>
+        {/* Assembly Negotiation Image (full width and height) */}
+        <div className="flex-1 relative" style={{ minHeight: '450px' }}>
+          <Image 
+            src="/assemblyNegotation.jpg" 
+            alt="Assembly Negotiation" 
+            fill
+            className="rounded-lg shadow-md object-cover"
+            priority
+            style={{ objectPosition: 'center 35%' }}
+          />
         </div>
       </div>
       
@@ -770,7 +840,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  handleSendMessage();
+                  handleSubmit();
                 }
               }}
             />
@@ -796,7 +866,7 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
             <Button
               variant="default"
               size="icon"
-              onClick={handleSendMessage}
+              onClick={handleSubmit}
               disabled={!userInput.trim() || isSpeaking}
               className="h-10 w-10 bg-policy-maroon hover:bg-policy-maroon/90 rounded-full"
             >

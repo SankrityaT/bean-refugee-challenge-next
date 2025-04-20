@@ -149,8 +149,6 @@ export default function PoliticalAssemblyDebatePage() {
   const [currentPolicyDebateComplete, setCurrentPolicyDebateComplete] = useState(false);
   // Add a conversation key to force ConversationManager to reinitialize when switching policies
   const [conversationKey, setConversationKey] = useState(0);
-  // Track when agents are speaking to disable policy selection and completion
-  const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
 
   // Helper to get the currently selected policy object
   const getSelectedPolicy = () => {
@@ -490,11 +488,9 @@ export default function PoliticalAssemblyDebatePage() {
                     : isDebated 
                       ? 'bg-green-100 text-green-800 border-green-300' 
                       : 'bg-white text-blue-700'
-                } shadow hover:${canSelect && !isAgentSpeaking ? 'bg-blue-200' : 'bg-gray-100'} relative ${
-                  isAgentSpeaking ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
+                } shadow hover:${canSelect ? 'bg-blue-200' : 'bg-gray-100'} relative`}
                 onClick={() => {
-                  if (canSelect && !isAgentSpeaking) {
+                  if (canSelect) {
                     if (isConversationStarted && currentPolicyDebateComplete) {
                       startNewPolicyDebate(policy.id);
                     } else if (!isConversationStarted) {
@@ -502,7 +498,7 @@ export default function PoliticalAssemblyDebatePage() {
                     }
                   }
                 }}
-                disabled={(isConversationStarted && !currentPolicyDebateComplete && !isActive) || isAgentSpeaking}
+                disabled={isConversationStarted && !currentPolicyDebateComplete && !isActive}
               >
                 {policy.title}
                 {isActive && isConversationStarted && !currentPolicyDebateComplete && (
@@ -716,7 +712,6 @@ export default function PoliticalAssemblyDebatePage() {
                   selectedPolicies={selectedPolicy ? [selectedPolicy] : []}
                   agents={selectedAgents}
                   onConversationUpdate={setNegotiationLogs}
-                  onSpeakingStateChange={setIsAgentSpeaking}
                   userTitle="Policy Advisor"
                   showMic={true}
                   showAgentVoice={true}
@@ -735,10 +730,7 @@ export default function PoliticalAssemblyDebatePage() {
                     <div className="flex justify-center">
                       <Button 
                         onClick={finishPolicyDebate}
-                        disabled={isAgentSpeaking}
-                        className={`bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-full ${
-                          isAgentSpeaking ? 'opacity-50 cursor-not-allowed' : ''
-                        }`}
+                        className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-full"
                       >
                         <span className="flex items-center gap-2">
                           Complete Policy Discussion

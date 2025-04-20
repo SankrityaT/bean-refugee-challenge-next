@@ -38,7 +38,6 @@ interface ConversationManagerProps {
     concerns?: string[];
   }[];
   onConversationUpdate?: (logs: any[]) => void;
-  onSpeakingStateChange?: (isSpeaking: boolean) => void;
   userTitle?: string;
   showMic?: boolean;
   showAgentVoice?: boolean;
@@ -52,7 +51,6 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
   selectedPolicies,
   agents,
   onConversationUpdate = () => {},
-  onSpeakingStateChange = () => {}, // Default empty function
   userTitle = "Policy Advisor",
   showMic = true,
   showAgentVoice = true,
@@ -95,11 +93,6 @@ const ConversationManager: React.FC<ConversationManagerProps> = ({
       stopSpeechRecognition();
     };
   }, []);
-  
-  // Effect to notify parent component when speaking state changes
-  useEffect(() => {
-    onSpeakingStateChange(isSpeaking || isAgentLoading);
-  }, [isSpeaking, isAgentLoading, onSpeakingStateChange]);
 
   // Initialize messages based on policy-specific mode
   // Store conversation state in refs to prevent re-renders
